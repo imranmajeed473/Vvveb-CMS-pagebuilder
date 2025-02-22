@@ -27,7 +27,7 @@ use Vvveb\System\Db;
 define('TAB', "\n\n\t\t");
 
 #[\AllowDynamicProperties]
-class SqlP {
+class Sqlp {
 	private $types = ['int' => 'i', 'double' => 'd', 'decimal' => 'd', 'blob' => 'b', 'array' => 'a'/*, 'CHAR' => 's'*/];
 
 	private $prefix = DB_PREFIX;
@@ -35,6 +35,20 @@ class SqlP {
 	private $config = [];
 
 	private $tree = [];
+
+	private $filters = [];
+
+	private $params = [];
+
+	private $db;
+
+	private $namespace;
+
+	private $model;
+
+	private $modelName;
+
+	private $filename;
 
 	function __construct() {
 		$this->db     = Db::getInstance();
@@ -289,7 +303,8 @@ class SqlP {
 					preg_replace_callback(
 						$this->config['varRegex'],
 						function ($matches) {
-							return '$params[\'' . $matches[1] . '\']';
+							return '$' . \Vvveb\dotToArrayKey('params.' . $matches[1]);
+						//return '$params[\'' . $matches[1] . '\']';
 						},
 					$match[$varMatch[1]]);
 				},
@@ -319,6 +334,7 @@ class SqlP {
 				$each = "\n" . TAB . 'if (isset($params' . $resultKey . ') && is_array($params' . $resultKey . '))' .
 				'foreach ($params' . $resultKey . ' as $key => $rowParent) { ' . "\n" . TAB . ' 
 					$params[\'each\'] = $rowParent;
+					$params[\'each_key\'] = $key;
 					if (is_array($params[\'each\'])) {
 						$paramTypes[\'each\'] = \'a\';
 					} else if (is_int($params[\'each\'])) {
@@ -363,8 +379,7 @@ class SqlP {
 
 		$lex       = new Lexer($this->config['tokenMap'],  $this->config['macroMap']);
 		$structure = $lex->lex($statement);
-		//\Vvveb\d($structure);
-		//die();
+
 		$output    = $lex->treeMacro($structure);
 		$statement = $lex->treeToPhp($output, $this->config['macroMap']);
 
@@ -372,16 +387,13 @@ class SqlP {
 		//replace result variables
 		$statement =
 					preg_replace_callback(
-						'/@result.(\w+)/',
+						'/@result\.([\w\.]+)/',
 						function ($matches) {
-							$key = $matches[1];
+							$key = \Vvveb\dotToArrayKey('$results.' . $matches[1]);
 
-							return "' . (isset(\$results['$key']) ? \$results['$key'] : 'NULL') . '";
-						//return "' . \$results['". $matches[1] . "'] . '";
+							return "' . (isset($key) ? $key : 'NULL') . '";
 						},
 					$statement);
-
-		//$variable
 
 		//FILTER
 		if (preg_match_all($this->config['filterRegex'], $statement, $matches, PREG_SET_ORDER)) {
@@ -406,17 +418,20 @@ class SqlP {
 					$filter[$name] = $column;
 				}
 
-				$filterArray = var_export($filter, true);
+				//$filterArray = var_export($filter, true);
 				$return      = ! empty($match['return']) ? $match['return'] : $match['data'];
 				$return      = '$params' . $this->sqlPhpArrayKey($return);
 				$key         = '$params' . $this->sqlPhpArrayKey($match['data']);
+				$filterName  = '$this->filters[\'' . $this->prefix . $match['columns'] . '\']';
 
-				$filterFunction = '\';' . TAB . '$filterArray = ' . $filterArray . ";\n" . TAB;
+				//$filterFunction = '\';' . TAB . '$filterArray = ' . $filterArray . ";\n" . TAB;
+				$filterFunction                                   = '\';' . TAB;
+				$this->filters[$this->prefix . $match['columns']] =  $filter;
 
 				if ($isArray == 'true') {
-					$filterFunction .= 'foreach ( ' . $key . ' as $key => &$filter) ' . $return . '[$key] = $this->db->filter($filter, $filterArray,' . $addMissingDefaults . ');' . TAB . '$sql = \'';
+					$filterFunction .= 'if (isset(' . $key . ') && is_array(' . $key . ')) foreach ( ' . $key . ' as $key => &$filter) ' . $return . '[$key] = $this->db->filter($filter, ' . $filterName . ',' . $addMissingDefaults . ');' . TAB . '$sql = \'';
 				} else {
-					$filterFunction .= $return . '= $this->db->filter(' . $key . ', $filterArray,' . $addMissingDefaults . ');' . TAB . '$sql = \'';
+					$filterFunction .= $return . '= $this->db->filter(' . $key . ', ' . $filterName . ',' . $addMissingDefaults . ');' . TAB . '$sql = \'';
 				}
 
 				$statement = str_replace($match[0], $filterFunction, $statement);
@@ -442,6 +457,10 @@ class SqlP {
 
 				if (isset($match[4])) {
 					$param['length'] = (int)preg_replace('/[^\d]/', '',$match[4]);
+				}
+
+				if (isset($match[5])) {
+					$param['comment'] = trim($match[5], " \n\r\t\v\x00-");
 				}
 
 				$parameters[] = $param;
@@ -502,12 +521,14 @@ class SqlP {
 
 		//remove comments
 		$sql = preg_replace('@(--.*)\s+@', '', $sql);
+		$this->tree = [];
 
 		if (preg_match_all($this->config['functionRegex'], $sql, $matches, PREG_SET_ORDER)) {
 			foreach ($matches as $match) {
 				$method['name']      = trim($match['name'], '`"\'');
 				//add slashes only for single quotes
 				$method['statement'] = str_replace("'", "\'",trim($match['statement']));
+				$method['statement'] = preg_replace('@(--.*)\s+@', '', $method['statement']);
 
 				$method['params'] = $this->parseParameters($match['params']);
 
@@ -516,6 +537,10 @@ class SqlP {
 				$this->tree[$method['name']] = $method;
 			}
 		}
+	}
+
+	function getModel() {
+		return $this->tree;
 	}
 
 	function generateModel() {
@@ -606,12 +631,26 @@ class SqlP {
 									}
 								} ,$method['params'])), "\n\t");
 				*/
+				/*
 				$method['param_types'] = 'array(' . trim(implode(', ', array_map(
 								function ($param) {
 									if ($param['in_out'] == 'IN' && ($type = $this->paramType($param['type']))) {
 										return '\'' . $param['name'] . '\' => \'' . $type . '\'';
 									}
 								} ,$method['params'])), ', ') . ')';
+				*/
+
+				$paramTypes = [];
+
+				foreach ($method['params'] as $param) {
+					if ($param['in_out'] == 'IN' && ($type = $this->paramType($param['type']))) {
+						$paramTypes[$param['name']] = $type;
+					}
+				}
+
+				$this->paramTypes[$method['name']] = $paramTypes;
+
+				$method['param_types'] = '$this->paramTypes[\'' . $method['name'] . '\']';
 
 				$method['fetch'] = $this->fetchType('fetch_all');
 
@@ -653,10 +692,12 @@ class SqlP {
 		}
 
 		$model = $this->template($this->model['model'],[
-			'name'         => ucfirst($this->modelName),
-			'namespace'    => ucfirst($this->namespace),
-			'filename'     => $this->filename,
-			'methods'      => $methods,
+			'name'       => ucfirst($this->modelName),
+			'namespace'  => ucfirst($this->namespace),
+			'filename'   => $this->filename,
+			'methods'    => $methods,
+			'filters'    => var_export($this->filters, true),
+			'paramTypes' => var_export($this->paramTypes, true),
 		]);
 
 		return $model;

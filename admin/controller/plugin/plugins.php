@@ -24,13 +24,14 @@ namespace Vvveb\Controller\Plugin;
 
 use function Vvveb\__;
 use Vvveb\Controller\Base;
+use function Vvveb\fileUploadErrMessage;
 use function Vvveb\rrmdir;
+use Vvveb\System\CacheManager;
 use function Vvveb\System\Core\exceptionToArray;
 use Vvveb\System\Core\FrontController;
 use Vvveb\System\Core\View;
 use Vvveb\System\Extensions\Plugins as PluginsList;
 use Vvveb\System\User\Admin;
-use Vvveb\System\CacheManager;
 
 class Plugins extends Base {
 	function init() {
@@ -50,10 +51,10 @@ class Plugins extends Base {
 		return $this->index();
 	}
 
-	function activate() {
+	function checkPluginAndActivate() {
 		$global                     = $this->request->get['plugin'] ?? false;
 		$this->category             = $this->request->get['category'] ?? false;
-		$this->pluginCheckUrl       = \Vvveb\url(['module' => 'plugin/plugins', 'action'=> 'checkPluginAndActivate', 'plugin' => $this->plugin, 'category' => $this->category]);
+		$this->pluginCheckUrl       = \Vvveb\url(['module' => 'plugin/plugins', 'action'=> 'activate', 'plugin' => $this->plugin, 'category' => $this->category]);
 		$this->view->checkPluginUrl = $this->pluginCheckUrl;
 		$this->view->info[]         = sprintf(__('Activating %s plugin ...'), '<b>' . \Vvveb\humanReadable($this->plugin) . '</b> <span class="spinner-border spinner-border-sm align-middle" role="status" aria-hidden="true"></span>');
 
@@ -66,7 +67,7 @@ class Plugins extends Base {
 		$cache            = (bool)($this->request->get['cache'] ?? true);
 		$view->plugins    = PluginsList :: getList($this->global['site_id'], $view->category, $cache);
 		$view->categories = PluginsList :: getCategories($this->global['site_id']);
-		$view->safemode   = ($admin = Admin::current()) && isset($admin['safemode']);
+		$view->safemode   = ($admin = Admin::current()) && isset($admin['safemode']) && $admin['safemode'];
 	}
 
 	function delete() {
@@ -99,7 +100,7 @@ class Plugins extends Base {
 		$error = false;
 
 		foreach ($files as $file) {
-			if ($file) {
+			if ($file && $file['error'] == UPLOAD_ERR_OK) {
 				try {
 					// use temorary file, php cleans temporary files on request finish.
 					$this->pluginSlug = PluginsList :: install($file['tmp_name'], str_replace('.zip', '', strtolower($file['name'])));
@@ -107,19 +108,23 @@ class Plugins extends Base {
 					$error                = $e->getMessage();
 					$this->view->errors[] = $error;
 				}
+			} else {
+				$error                 = true;
+				$this->view->errors[]  = sprintf(__('Error uploading %s!'), $file['name']);
+				$this->view->warning[] = sprintf(fileUploadErrMessage($file['error']));
 			}
 
 			if (! $error) {
 				if ($this->pluginSlug) {
 					$this->pluginName        = \Vvveb\humanReadable($this->pluginSlug);
 					$this->pluginName        = "<b>$this->pluginName</b>";
-					$this->pluginActivateUrl = \Vvveb\url(['module' => 'plugin/plugins', 'action'=> 'activate', 'plugin' => $this->pluginSlug]);
+					$this->pluginActivateUrl = \Vvveb\url(['module' => 'plugin/plugins', 'action'=> 'checkPluginAndActivate', 'plugin' => $this->pluginSlug]);
 					$successMessage          = sprintf(__('Plugin %s was successfully installed!'), $this->pluginName, $this->pluginActivateUrl);
 					$successMessage .= "<p><a class='btn btn-primary btn-sm m-2'  href='{$this->pluginActivateUrl}'>" . __('Activate plugin') . '</a></p>';
-					$this->view->success[] = $successMessage;
+					$this->view->success[]   = $successMessage;
 				} else {
-					$errorMessage          = sprintf(__('Failed to install %s plugin!'), $this->pluginName);
-					$this->view->error[]   = $errorMessage;
+					$errorMessage            = sprintf(__('Failed to install %s plugin!'), $this->pluginName);
+					$this->view->error[]     = $errorMessage;
 				}
 			}
 		}
@@ -127,7 +132,7 @@ class Plugins extends Base {
 		return $this->index();
 	}
 
-	function checkPluginAndActivate() {
+	function activate() {
 		header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 		header('Cache-Control: post-check=0, pre-check=0', false);
 		header('Pragma: no-cache');
@@ -153,16 +158,16 @@ class Plugins extends Base {
 			$error['title']   = sprintf(__('Error activating plugin `%s`!'), $this->plugin);
 			FrontController::notFound(false, $error, 500);
 
-			die();
+			die(0);
 		}
 
 		if ($active) {
-			$refreshUrl = \Vvveb\url(['module' => 'plugin/plugins', 'cache' => false, 'category' => $this->category], false) . '&r=' . time();
+			$refreshUrl = \Vvveb\url(['module' => 'plugin/plugins', 'cache' => false, 'category' => $this->category], false) . '&t=' . time();
 			$success    =  sprintf(__('Plugin `%s` activated!'), \Vvveb\humanReadable($this->plugin));
 
 			ignore_user_abort(1);
 			clearstatcache(true);
-			
+
 			CacheManager::clearCompiledFiles();
 
 			if (defined('CLI')) {

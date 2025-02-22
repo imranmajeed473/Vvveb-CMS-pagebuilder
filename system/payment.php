@@ -31,6 +31,8 @@ class Payment {
 
 	private $instances = [];
 
+	private $instance;
+
 	public static function getInstance($options = []) {
 		static $inst = null;
 
@@ -44,15 +46,14 @@ class Payment {
 	public function __construct($options = []) {
 	}
 
-	public function getMethods() {
+	public function getMethods($checkoutInfo) {
 		$data = [];
 
-		foreach ($this->methods as $name => $options) {
-			$class                  = $options[0];
-			$params                 = $options[1];
-			$obj                    = new $class(Cart::getInstance());
-			$this->instances[$name] = $obj;
-			$paymentData            = $obj->getMethod($params);
+		foreach ($this->methods as $name => $method) {
+			list($class, $options)      =  $method;
+			$obj                        = new $class(Cart::getInstance());
+			$this->instances[$name]     = $obj;
+			$paymentData                = $obj->getMethod($checkoutInfo, $options);
 			//if payment method returns false or no data then don't add it to the list
 			if ($paymentData) {
 				$data[$name] = $paymentData;
@@ -62,14 +63,24 @@ class Payment {
 		return $data;
 	}
 
-	public function registerMethod($method, $class, $params = []) {
-		$this->methods[$method] = [$class, $params];
+	public function registerMethod($method, $class, $options = []) {
+		$this->methods[$method] = [$class, $options];
 	}
 
 	public function setMethod($method) {
 		foreach ($this->instances as $instance) {
 			$instance->init();
 		}
-		$this->instances[$method]->setMethod();
+
+		if (isset($this->instances[$method])) {
+			$this->instance = $this->instances[$method];
+			$this->instance->setMethod();
+		}
+	}
+
+	public function authorize(&$checkoutInfo = []) {
+		if ($this->instance) {
+			$this->instance->authorize($checkoutInfo);
+		}
 	}
 }

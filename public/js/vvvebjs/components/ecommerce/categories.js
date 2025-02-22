@@ -76,7 +76,7 @@ class CategoriesComponent {
 	constructor ()
 	{
 		this.name = "Categories";
-		this.attributes = ["data-v-component-categories"],
+		this.attributes = ["data-v-component-product-categories"],
 
 		this.image ="icons/categories.svg";
 		this.html = template;
@@ -86,14 +86,16 @@ class CategoriesComponent {
 
     init(node)
 	{
-		$('.mb-3[data-v-group]').attr('style','display:none !important');
-		if (node.dataset.type != undefined)
-		{
-			$('.mb-3[data-v-group="'+ node.dataset.type + '"]').attr('style','');
-		} else
-		{		
-			$('.mb-3[data-v-group]:first').attr('style','');
-		}
+		document.querySelectorAll('.mb-3[data-group]').forEach((el, i) => {
+			el.classList.add("d-none");
+		});			
+		
+		let source = node.dataset.vSource;
+		if (!source) {
+			source = "automatic";
+		} 
+
+		document.querySelectorAll('.mb-3[data-group="' + source + '"]').forEach(e => e.classList.remove("d-none"));
 	}
 }
 

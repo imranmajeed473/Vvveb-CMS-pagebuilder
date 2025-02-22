@@ -14,14 +14,17 @@
 	BEGIN
 		-- product_subscription
 		SELECT
-			   sp.*, 
-			   spc.name, 
+			   @IF isset(:product_id)
+			   THEN		
+				   sp.*, 
+				   spc.name, 
+			   END @IF	
 			   product_subscription.product_id,
 			   product_subscription.user_group_id,
 			   product_subscription.price, 
 			   product_subscription.trial_price
 			   
-			FROM product_subscription AS product_subscription
+			FROM product_subscription
 			
 			-- product_id
 			@IF isset(:product_id)
@@ -79,7 +82,7 @@
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:product_subscription_data  = @FILTER(:product_subscription, product_subscription);
+		:product_subscription_data  = @FILTER(:product_subscription, product_subscription)
 		
 		
 		INSERT INTO product_subscription 
@@ -100,7 +103,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:product_subscription, product_subscription);
+		@FILTER(:product_subscription, product_subscription)
 
 		UPDATE product_subscription
 			

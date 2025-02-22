@@ -29,7 +29,8 @@ use Vvveb\System\Event;
 
 class Site extends ComponentBase {
 	public static $defaultOptions = [
-		'site_id'  => null,
+		'site_id'     => null,
+		'language_id' => null,
 	];
 
 	protected $options = [];
@@ -42,7 +43,7 @@ class Site extends ComponentBase {
 	}
 
 	function results() {
-		$results = siteSettings($this->options['site_id']);
+		$results = siteSettings($this->options['site_id'], $this->options['language_id']);
 
 		if (! $results) {
 			$results    = ['logo'=>'logo.png', 'logo-sticky' => 'logo.png', 'logo-dark' => 'logo-white.png', 'logo-dark-sticky' => 'logo-white.png', 'favicon' => 'favicon.ico'];
@@ -53,7 +54,8 @@ class Site extends ComponentBase {
 			}
 		}
 
-		list($results) = Event :: trigger(__CLASS__,__FUNCTION__, $results);
+		$results['url'] = SITE_URL;
+		list($results)  = Event :: trigger(__CLASS__,__FUNCTION__, $results);
 
 		return $results;
 	}

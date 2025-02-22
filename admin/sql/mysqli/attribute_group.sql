@@ -18,7 +18,7 @@
 					,pa.value
 				END @IF		
 		
-			FROM attribute_group AS attribute_group
+			FROM attribute_group
 			INNER JOIN attribute_group_content 
 				ON attribute_group_content.attribute_group_id = attribute_group.attribute_group_id AND attribute_group_content.language_id = :language_id
 				
@@ -74,7 +74,7 @@
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:attribute_group_data  = @FILTER(:attribute_group, attribute_group);
+		:attribute_group_data  = @FILTER(:attribute_group, attribute_group)
 		
 		
 		INSERT INTO attribute_group 
@@ -84,7 +84,7 @@
 	  	VALUES ( :attribute_group_data );		
 		
 		
-		:attribute_group_content  = @FILTER(:attribute_group, attribute_group_content);
+		:attribute_group_content  = @FILTER(:attribute_group, attribute_group_content)
 	  	
 		INSERT INTO attribute_group_content 
 			
@@ -105,7 +105,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		:attribute_group_data = @FILTER(:attribute_group, attribute_group);
+		:attribute_group_data = @FILTER(:attribute_group, attribute_group)
 
 		UPDATE attribute_group
 			
@@ -114,7 +114,7 @@
 		WHERE attribute_group_id = :attribute_group_id;
 		
 		-- allow only table fields and set defaults for missing values
-		:attribute_group_content = @FILTER(:attribute_group, attribute_group_content);
+		:attribute_group_content = @FILTER(:attribute_group, attribute_group_content)
 
 		UPDATE attribute_group_content
 			

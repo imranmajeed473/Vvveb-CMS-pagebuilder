@@ -29,11 +29,14 @@ use function Vvveb\model;
 use function Vvveb\sanitizeHTML;
 use function Vvveb\slugify;
 use Vvveb\Sql\categorySQL;
+use Vvveb\Sql\SiteSQL;
+use Vvveb\System\Cache;
 use Vvveb\System\CacheManager;
 use Vvveb\System\Core\View;
 use Vvveb\System\Event;
 use Vvveb\System\Images;
 use Vvveb\System\Sites;
+use Vvveb\System\User\Admin;
 use Vvveb\System\Validator;
 
 class Edit extends Base {
@@ -45,24 +48,58 @@ class Edit extends Base {
 
 	use TaxonomiesTrait, AutocompleteTrait;
 
+	function sites($selectedSites = []) {
+		$sites = new SiteSQL();
+
+		$options = [];
+
+		if (Admin::hasCapability('edit_other_sites')) {
+			//unset($options['site_id']);
+		} else {
+			$options['site_id'] = Admin :: siteAccess();
+		}
+
+		$results = $sites->getAll(
+			$options + [
+				'start'        => 0,
+				'limit'        => 100,
+			]
+		)['site'] ?? [];
+
+		if ($results && $selectedSites) {
+			foreach ($results as &$site) {
+				$site['selected'] = in_array($site['site_id'], $selectedSites);
+			}
+		}
+
+		return $results;
+	}
+
 	function getThemeFolder() {
-		return DIR_THEMES . DS . Sites::getTheme() ?? 'default';
+		return DIR_THEMES . Sites::getTheme() ?? 'default';
 	}
 
 	function index() {
 		$view = $this->view;
 
-		$admin_path          = \Vvveb\adminPath();
-		$postOptions         = [];
-		$post                = [];
-		$post_id             = $this->request->get[$this->object . '_id'] ?? $this->request->post[$this->object . '_id'] ?? false;
+		$admin_path  = \Vvveb\adminPath();
+		$postOptions = [];
+		$post        = [];
+		$post_id     = $this->request->get[$this->object . '_id'] ?? $this->request->post[$this->object . '_id'] ?? false;
 
-		$controllerPath        = $admin_path . 'index.php?module=media/media';
-		$view->scanUrl         = "$controllerPath&action=scan";
-		$view->uploadUrl       = "$controllerPath&action=upload";
-		$theme                 = Sites::getTheme() ?? 'default';
-		$view->themeCss        = PUBLIC_PATH . "themes/$theme/css/admin-post-editor.css";
+		$controllerPath  = $admin_path . 'index.php?module=media/media';
+		$view->scanUrl   = "$controllerPath&action=scan";
+		$view->uploadUrl = "$controllerPath&action=upload";
+		$view->linkUrl   = $admin_path . 'index.php?module=content/post&action=urlAutocomplete';
+		$theme           = Sites::getTheme() ?? 'default';
+		$view->themeCss  = PUBLIC_PATH . "themes/$theme/css/admin-post-editor.css";
 		//$view->themeCss        = PUBLIC_PATH . "themes/$theme/css/style.css";
+
+		$viewCapability = 'view_other_posts';
+
+		if ($this->object == 'product') {
+			$viewCapability = 'view_other_products';
+		}
 
 		if ($post_id) {
 			$postOptions[$this->object . '_id'] = (int)$post_id;
@@ -81,6 +118,13 @@ class Edit extends Base {
 
 			$postOptions['type'] = $this->type;
 			$options             = $postOptions + $this->global;
+
+			if (Admin::hasCapability($viewCapability)) {
+				unset($options['admin_id']);
+			} else {
+				$options['admin_id'] = $this->global['admin_id'];
+			}
+
 			//get all languages
 			//unset($options['language_id']);
 			$post                = $posts->get($options);
@@ -102,7 +146,8 @@ class Edit extends Base {
 
 			//$productImages = $posts->getImages($postOptions);
 		} else {
-			$post['image_url'] = Images::image('',$this->object);
+			$post['image_url']  = Images::image('',$this->object);
+			$post['updated_at'] = date('Y-m-d H:i:s', time());
 		}
 
 		/*
@@ -128,39 +173,54 @@ class Edit extends Base {
 			$revisions = model($this->object . '_content_revision');
 		}
 
+		//get site host for current selected site to use for absolute url
+		$url = ['host' => $this->global['site_url']];
+
+		$revisionsUrl = \Vvveb\url(['module' => "$controller/revisions", 'object' => $this->object, 'type' => $this->type, $this->object . '_id' => $post_id]);
+		$name         = '';
+
 		if (isset($post[$this->object . '_content'])) {
 			foreach ($post[$this->object . '_content'] as &$content) {
 				if (! isset($post['url'])) {
-					$post['url'] = \Vvveb\url($route, ['slug'=> $content['slug']]);
+					$post['url'] = \Vvveb\url($route, ['slug'=> $content['slug'], $this->object . '_id' => $post_id] + $url);
 
-					if (! $post['url']) {
-						$post['url'] = \Vvveb\url($altRoute, ['slug'=> $content['slug']]);
+					if (! $post['url'] || $post['url'] == '//' . $this->global['site_url']) {
+						$post['url'] = \Vvveb\url($altRoute, ['slug'=> $content['slug'], $this->object . '_id' => $post_id] + $url);
 					}
 				}
 				$language = [];
 
 				if ($content['language_id'] != $this->global['default_language_id']) {
+					$code = 'en_US';
+
 					foreach ($this->view->languagesList as $code => $lang) {
 						if ($lang['language_id'] == $content['language_id']) {
 							break;
 						}
 					}
 					$language = ['language' => $code];
+				} else {
+					$name = $content['name'];
 				}
 
-				$content['url']             = \Vvveb\url($route, $content + $language);
+				$content['url']             = \Vvveb\url($route, $content + $language + $url);
 				$content['revision_count']  = 0;
 
-				if (! $content['url']) {
-					$content['url']         = \Vvveb\url($altRoute, $content + $language);
+				if (! $content['url'] || $content['url'] == '//' . $this->global['site_url']) {
+					$content['url']         = \Vvveb\url($altRoute, $content + $language + $url);
 				}
 
 				if ($revisions) {
 					$revision = $revisions->getAll([$this->object . '_id' => $post_id, 'language_id' => $content['language_id']]);
 
 					if ($revision) {
+						foreach ($revision[$this->object . '_content_revision'] as &$rev) {
+							$rev['preview-url'] = $content['url'] . '?revision=preview&created_at=' . $rev['created_at'] . '&language_id=' . $content['language_id'];
+							$rev['compare-url'] = $revisionsUrl . '&created_at=' . $rev['created_at'] . '&language_id=' . $content['language_id'];
+						}
+
 						$content['revision_count'] = $revision['count'];
-						$content['revision']       = $revision['revision'];
+						$content['revision']       = $revision[$this->object . '_content_revision'];
 					}
 				}
 			}
@@ -172,8 +232,10 @@ class Edit extends Base {
 		$template        = isset($post['template']) && $post['template'] ? $post['template'] : $defaultTemplate;
 		$themeFolder     = $this->getThemeFolder();
 
+		$design_url = '';
+
 		if (isset($post['url'])) {
-			$design_url         = $admin_path . \Vvveb\url(['module' => 'editor/editor', 'url' => $post['url'], 'template' => $template], false, false);
+			$design_url         = \Vvveb\url(['module' => 'editor/editor', 'name' => urlencode($name),  'url' => $content['url'], 'template' => $template, 'host' => $this->global['site_url'] . $admin_path], false, false);
 			$post['design_url'] = $design_url;
 		}
 
@@ -189,18 +251,35 @@ class Edit extends Base {
 			$view->taxonomies = $this->taxonomies($post[$this->object . '_id'] ?? false);
 		}
 
+		$sites = $post[$this->object . '_to_site'] ?? [];
+
+		if ($sites) {
+			$sites = array_keys($sites);
+		} else {
+			if (! $post_id) {
+				$sites[] = $this->global['site_id'];
+			}
+		}
+
+		$view->sitesList = $this->sites($sites);
+
 		list($post, $post_id) = Event :: trigger(__CLASS__,__FUNCTION__, $post, $post_id);
 
-		$object                    = $this->object;
-		$view->$object             = $post;
-		$view->status              = ['publish' => 'Publish', 'draft' => 'Draft', 'pending' => 'Pending', 'private' => 'Private', 'password' => 'Password'];
-		$view->templates           = \Vvveb\getTemplateList(false, ['email']);
+		$object          = $this->object;
+		$view->$object   = $post;
+		$view->status    = ['publish' => 'Publish', 'draft' => 'Draft', 'pending' => 'Pending', 'private' => 'Private', 'password' => 'Password', 'future' => 'Future'];
+
+		$view->templates = Cache::getInstance()->cache(APP,'template-list.' . $this->global['site_id'],function () {
+			return \Vvveb\getTemplateList(false, ['email']);
+		}, 604800);
+
 		//$validator                 = new Validator([$this->object]);
 		//$view->validatorJson       = $validator->getJSON();
-		$view->type                = __($this->type);
-		$view->type_name           = $type_name;
-		$view->posts_list_url      =  \Vvveb\url(['module' => $this->list, 'type' => $this->type]);
-		$view->revisions_url       =  \Vvveb\url(['module' => "$controller/revisions", 'object' => $this->object, 'type' => $this->type, $this->object . '_id' => $post_id]);
+		$view->type           = __($this->type);
+		$view->type_name      = $type_name;
+		$view->posts_list_url =  \Vvveb\url(['module' => $this->list, 'type' => $this->type]);
+		$view->revisions_url  =  $revisionsUrl;
+		$view->oEmbedProxyUrl = $admin_path . 'index.php?module=editor/editor&action=oEmbedProxy';
 	}
 
 	private function addCategory($taxonomy_id, $name) {
@@ -213,6 +292,10 @@ class Edit extends Base {
 		] + $this->global);
 
 		return $category_id = $cat['taxonomy_item'];
+	}
+
+	function add() {
+		$this->save();
 	}
 
 	function save() {
@@ -260,23 +343,46 @@ class Edit extends Base {
 					foreach ($tags as $tagId => $tag) {
 						//existing tag add to post taxonomy_item list
 						if (is_numeric($tagId)) {
-							//$post['taxonomy_item'][] = $tagId;
+							//$post['taxonomy_item_id'][] = $tagId;
 						} else {
 							//add new taxonomy_item
 							$tagId = $this->addCategory($listId, $tag);
 						}
-						$post['taxonomy_item'][] = $tagId;
+						$post['taxonomy_item_id'][] = $tagId;
 					}
 				}
 			}
 
-			$post = $post + $this->global;
+			$site_id = $this->request->post['site'] ?? []; //[$this->global['site_id']];
 
-			$new = false;
+			$post = $post + $this->global;
+			$new  = false;
 
 			if ($post_id) {
-				$post[$this->object . '_id']                     = (int)$post_id;
-				$result                                          = $posts->edit([$this->object => $post, $this->object . '_id' => $post_id] + $this->global);
+				/*
+				$viewCapability = 'edit_other_posts';
+
+				if ($this->object == 'product') {
+					$viewCapability = 'edit_other_products';
+				}
+
+				if (Admin::hasCapability($viewCapability)) {
+					unset($postOptions['admin_id']);
+				} else {
+					$postOptions['admin_id'] = $this->global['admin_id'];
+				}
+				*/
+
+				$post[$this->object . '_id'] = (int)$post_id;
+				$data                        = [
+					$this->object              => $post,
+					$this->object . '_id'      => $post_id,
+					$this->object . '_content' => $post[$this->object . '_content'],
+					'taxonomy_item_id'         => $post['taxonomy_item_id'] ?? [],
+					'site_id'                  => $site_id,
+				] + $this->global;
+
+				$result = $posts->edit($data);
 
 				if ($result >= 0) {
 					$this->view->success['get'] = ucfirst($this->type) . ' ' . __('saved') . '!';
@@ -309,16 +415,24 @@ class Edit extends Base {
 					unset($post['updated_at'], $post[$this->object . '_id']);
 				}
 
-				$return                            = $posts->add([$this->object => $post] + $this->global);
-				$id                                = $return[$this->object] ?? false;
+				$add = [
+					$this->object              => $post,
+					$this->object . '_content' => $post[$this->object . '_content'],
+					'taxonomy_item_id'         => $post['taxonomy_item_id'] ?? [],
+					'site_id'                  => $site_id,
+				] + $this->global;
+
+				$return = $posts->add($add);
+				$id     = $return[$this->object] ?? false;
 
 				if (! $id) {
 					$view->errors = [$posts->error];
 				} else {
 					CacheManager::delete($this->object);
 					$this->request->get[$this->object . '_id'] = $id;
-					$post_id                                   = $id;
-					$new                                       = true;
+
+					$post_id = $id;
+					$new     = true;
 
 					$message              = ucfirst($this->type) . ' ' . __('saved') . '!';
 					$view->success['get'] = $message;

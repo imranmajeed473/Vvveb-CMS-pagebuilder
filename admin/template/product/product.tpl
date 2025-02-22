@@ -4,7 +4,7 @@ import(content/edit.tpl, {"type":"product"})
 [data-v-product] .autocomplete|data-text = <?php 
 	$text = '@@__data-v-product-(*)__@@_text';
 	$value = $this->$text ?? '';
-	echo $value;
+	echo htmlspecialchars($value);
 ?>
 
 import(product/product/variant.tpl)
@@ -19,12 +19,6 @@ import(product/product/points.tpl)
 import(product/product/digital_asset.tpl)
 
 
-// featured media
-[data-v-product] [data-v-image]|data-v-image = $this->product['image_url']
-[data-v-product] input[data-v-image]|value = $this->product['image']
-[data-v-product] [data-v-image]|src = <?php echo $this->product['image_url'] ? $this->product['image_url'] : 'img/placeholder.svg';?>
-
-
 [data-v-product] [data-v-url]|href = $this->product['url']
 [data-v-product] [data-v-url] = $this->product['url']
 
@@ -34,8 +28,8 @@ import(product/product/digital_asset.tpl)
 	if ($value) echo 'checked';
 ?>
 
-[data-v-template_missing]    = <?php echo $this->template_missing;?>
-[data-v-type_name_plural]    = $this->type_name_plural
-[data-v-type-name]           = $this->type_name
-[data-v-type]                = $this->type
+[data-v-template_missing]       = $this->template_missing
+[data-v-type_name_plural]       = $this->type_name_plural
+[data-v-type-name]              = $this->type_name
+[data-v-type]                   = $this->type
 [data-v-products-list-url]|href = $this->posts_list_url

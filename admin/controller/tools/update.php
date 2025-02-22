@@ -27,10 +27,11 @@ use function Vvveb\camelToUnderscore;
 use Vvveb\Controller\Base;
 use function Vvveb\humanReadable;
 use Vvveb\System\Update as UpdateSys;
+use Vvveb\System\User\Admin;
 use function Vvveb\url;
 
 class Update extends Base {
-	private $steps = ['download', 'unzip', 'backup', 'copySystem', 'copyApp', 'copyInstall', 'copyAdmin', 'copyCore',  'copyConfig', 'copyPublic', 'copyPublicAdmin', 'copyPublicMedia', 'setPermissions', 'cleanUp', 'clearCache'];
+	private $steps = ['checkPermissions', 'download', 'unzip', 'copyInstall', /*'backup',*/ 'copySystem', /* 'copyAdmin',*/ , 'createNewTables', 'copyApp', 'copyCore', 'copyConfig', 'copyPublic', 'copyPublicAdmin', 'copyPublicMedia', 'setFilePermissions', 'cleanUp', 'clearCache', 'complete'];
 
 	function __construct() {
 		$this->update = new UpdateSys();
@@ -129,6 +130,8 @@ class Update extends Base {
 		$updateFile       = false;
 		$errorDownloadMsg = __('Error downloading update!');
 		$updateInfo       = $this->update->checkUpdates();
+		//don't load plugins during update to avoid possible conflicts
+		Admin::session(['safemode' => true]);
 
 		try {
 			$updateFile = $this->update->download($updateInfo['download']);
@@ -148,11 +151,31 @@ class Update extends Base {
 		return true;
 	}
 
-	function backup() {
+	function checkPermissions() {
+		$result = false;
+
 		try {
-			//$result = $this->update->backup();
-			//$install = $this->update->unzip($updateFile);
-			$result = true;
+			$result = $this->update->checkPermissions();
+		} catch (\Exception $e) {
+			$this->view->errors[] = $e->getMessage();
+		}
+
+		if ($result === true) {
+			$this->view->info[] = __('Permissions ok!');
+		} else {
+			$this->view->errors[] = sprintf(__('%s not writable!'), $result);
+
+			return false;
+		}
+
+		return $result;
+	}
+
+	function backup() {
+		$result = false;
+
+		try {
+			$result = $this->update->backup();
 		} catch (\Exception $e) {
 			$this->view->errors[] = $e->getMessage();
 		}
@@ -164,8 +187,25 @@ class Update extends Base {
 		return $result;
 	}
 
+	function createNewTables() {
+		$result = false;
+
+		try {
+			$result = $this->update->createNewTables();
+		} catch (\Exception $e) {
+			$this->view->errors[] = $e->getMessage();
+		}
+
+		if ($result) {
+			$this->view->info[] = __('Create new tables successful!');
+		}
+
+		return $result;
+	}
+
 	function unzip() {
 		$errorInstallMsg  = __('Error unzipping update!');
+		$result           = true;
 
 		try {
 			$updateFile = $this->session->get('updateFile');
@@ -183,11 +223,15 @@ class Update extends Base {
 		return $result;
 	}
 
-	function copyCore() {
-		$errorInstallMsg = __('Error updating core');
+	private function copy($method) {
+		$name            = humanReadable(camelToUnderscore($method));
+		$errorInstallMsg = sprintf(__('Error updating %s'), $name);
+		$result          = false;
+
+		$method = "copy$method";
 
 		try {
-			$result = $this->update->copyCore();
+			$result = $this->update->$method();
 		} catch (\Exception $e) {
 			$this->view->errors[] = $e->getMessage();
 		}
@@ -195,158 +239,59 @@ class Update extends Base {
 		if (! $result) {
 			$this->view->errors[] = $errorInstallMsg;
 		} else {
-			$this->view->success[] = __('Update core successful!');
+			$this->view->success[] = sprintf(__('Update %s successful!'), $name);
 		}
 
 		return $result;
+	}
+
+	function copyCore() {
+		return $this->copy('Core');
 	}
 
 	function copyConfig() {
-		$errorInstallMsg = __('Error updating config');
-
-		try {
-			$result = $this->update->copyConfig();
-		} catch (\Exception $e) {
-			$this->view->errors[] = $e->getMessage();
-		}
-
-		if (! $result) {
-			$this->view->errors[] = $errorInstallMsg;
-		} else {
-			$this->view->success[] = __('Update config successful!');
-		}
-
-		return $result;
+		return $this->copy('Config');
 	}
 
 	function copySystem() {
-		$errorInstallMsg = __('Error updating system');
+		//merge system and admin in one step so that the updater does not break if depends on older system code.
+		$return = $this->copy('System');
 
-		try {
-			$result = $this->update->copySystem();
-		} catch (\Exception $e) {
-			$this->view->errors[] = $e->getMessage();
+		if ($return) {
+			$return = $this->copy('Admin');
 		}
 
-		if (! $result) {
-			$this->view->errors[] = $errorInstallMsg;
-		} else {
-			$this->view->success[] = __('Update system successful!');
-		}
-
-		return $result;
+		return $return;
 	}
 
-	function copyApp() {
-		$errorInstallMsg = __('Error updating app');
-
-		try {
-			$result = $this->update->copyApp();
-		} catch (\Exception $e) {
-			$this->view->errors[] = $e->getMessage();
-		}
-
-		if (! $result) {
-			$this->view->errors[] = $errorInstallMsg;
-		} else {
-			$this->view->success[] = __('Update app successful!');
-		}
-
-		return $result;
-	}
-
+	/*
 	function copyAdmin() {
-		$errorInstallMsg = __('Error updating system');
-
-		try {
-			$result = $this->update->copyAdmin();
-		} catch (\Exception $e) {
-			$this->view->errors[] = $e->getMessage();
-		}
-
-		if (! $result) {
-			$this->view->errors[] = $errorInstallMsg;
-		} else {
-			$this->view->success[] = __('Update system successful!');
-		}
-
-		return $result;
+		return $this->copy('Admin');
+	}
+	*/
+	function copyApp() {
+		return $this->copy('App');
 	}
 
 	function copyInstall() {
-		$errorInstallMsg = __('Error updating install');
-
-		try {
-			$result = $this->update->copyInstall();
-		} catch (\Exception $e) {
-			$this->view->errors[] = $e->getMessage();
-		}
-
-		if (! $result) {
-			$this->view->errors[] = $errorInstallMsg;
-		} else {
-			$this->view->success[] = __('Update install successful!');
-		}
-
-		return $result;
+		return $this->copy('Install');
 	}
 
 	function copyPublic() {
-		$errorInstallMsg = __('Error updating public');
-
-		try {
-			$result = $this->update->copyPublic();
-		} catch (\Exception $e) {
-			$this->view->errors[] = $e->getMessage();
-		}
-
-		if (! $result) {
-			$this->view->errors[] = $errorInstallMsg;
-		} else {
-			$this->view->success[] = __('Update public successful!');
-		}
-
-		return $result;
+		return $this->copy('Public');
 	}
 
 	function copyPublicAdmin() {
-		$errorInstallMsg = __('Error updating public admin');
-
-		try {
-			$result = $this->update->copyPublicAdmin();
-		} catch (\Exception $e) {
-			$this->view->errors[] = $e->getMessage();
-		}
-
-		if (! $result) {
-			$this->view->errors[] = $errorInstallMsg;
-		} else {
-			$this->view->success[] = __('Update public admin successful!');
-		}
-
-		return $result;
+		return $this->copy('PublicAdmin');
 	}
 
 	function copyPublicMedia() {
-		$errorInstallMsg = __('Error updating public media');
-
-		try {
-			$result = $this->update->copyPublicMedia();
-		} catch (\Exception $e) {
-			$this->view->errors[] = $e->getMessage();
-		}
-
-		if (! $result) {
-			$this->view->errors[] = $errorInstallMsg;
-		} else {
-			$this->view->success[] = __('Update public successful!');
-		}
-
-		return $result;
+		return $this->copy('PublicMedia');
 	}
 
-	function setPermissions() {
+	function setFilePermissions() {
 		$errorInstallMsg = __('Error setting permissions');
+		$result          = false;
 
 		try {
 			$result = $this->update->setPermissions();
@@ -365,6 +310,7 @@ class Update extends Base {
 
 	function cleanUp() {
 		$errorInstallMsg = __('Error cleaning up');
+		$result          = false;
 
 		try {
 			$result = $this->update->cleanup();
@@ -383,6 +329,7 @@ class Update extends Base {
 
 	function clearCache() {
 		$errorInstallMsg = __('Error clearing cache');
+		$result          = false;
 
 		try {
 			$result = $this->update->clearCache();
@@ -399,6 +346,13 @@ class Update extends Base {
 		return $result;
 	}
 
+	function complete() {
+		$this->view->success[] = __('Update complete!');
+		Admin::session(['safemode' => false]);
+
+		return true;
+	}
+
 	function update() {
 		$this->request->get['step'] = $this->steps[0];
 		$info                       = __('Update in progress, do not close this page ...');
@@ -412,85 +366,21 @@ class Update extends Base {
 			$this->updateNext();
 		}
 
-		return;
-		$updateInfo       = $this->update->checkUpdates();
-		$errorDownloadMsg = __('Error downloading update!');
-
-		try {
-			$updateFile = $this->update->download($updateInfo['download']);
-		} catch (\Exception $e) {
-			$this->view->errors[] = $e->getMessage();
-		}
-
-		if (! $updateInfo) {
-			$this->view->errors[] = $errorDownloadMsg;
-
-			return;
-		} else {
-			//$this->view->info[] = $updateInfo['download'] . __(' downloaded successfully');
-		}
-
-		if ($updateFile) {
-			$this->update->setPermissions();
-
-			try {
-				$this->update->backup();
-				$install = $this->update->install($updateFile);
-			} catch (\Exception $e) {
-				$this->view->errors[] = $e->getMessage();
-			}
-
-			try {
-				$this->update->setPermissions();
-			} catch (\Exception $e) {
-				$this->view->errors[] = $e->getMessage();
-			}
-
-			//set maintenance
-			if (! $install) {
-				$this->view->errors[] = $errorInstallMsg;
-			} else {
-				$this->view->success[] = __('Update successful!');
-			}
-
-			//unset maintenance
-		}
-
 		return $this->index();
 	}
 
 	function index() {
 		$updateInfo = $this->checkUpdates();
 
+		if (isset($updateInfo['error']) && $updateInfo['error']) {
+			$this->view->errors[] = $updateInfo['error'];
+		}
+
 		$info = [
 			'core' => [
 				'current'   => V_VERSION,
 				'latest'    => $updateInfo['version'] ?? '',
-				'hasUpdate' => $updateInfo['hasUpdate'],
-			],
-			'themes' => [
-				[
-					'mytheme' => [
-						'current'               => V_VERSION,
-						'latest'                => V_VERSION,
-					],
-					'mytheme2' => [
-						'current'               => V_VERSION,
-						'latest'                => V_VERSION,
-					],
-				],
-			],
-			'plugins' => [
-				[
-					'myplugin' => [
-						'current'               => V_VERSION,
-						'latest'                => V_VERSION,
-					],
-					'myplugin2' => [
-						'current'               => V_VERSION,
-						'latest'                => V_VERSION,
-					],
-				],
+				'hasUpdate' => $updateInfo['hasUpdate'] ?? false,
 			],
 		];
 

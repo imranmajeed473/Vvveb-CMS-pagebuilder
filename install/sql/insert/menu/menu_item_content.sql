@@ -111,9 +111,9 @@ INSERT INTO `menu_item_content` VALUES
 (64,1, 'Pricing', 'Pricing', ''),
 (65,1, 'Services', 'Services', ''),
 (66,1, 'Portfolio', 'Portfolio', ''),
-(67,1, 'Mega menu', '', '<p><img src="/media/vvveb.svg" height="24" alt="" class="me-2">Mega menu</p>'),
+(67,1, 'Mega menu', '', '<img src="/media/vvveb.svg" height="24" alt="" class="me-2">Mega menu'),
 (68,1, 'Features', '', '<div class="row">
-	<div class="col-6 align-self-center"><img src="/media/posts/4.jpg" alt="Post" width="250" loading="lazy" class="rounded"></div>
+	<div class="col-6 align-self-center"><img src="../../media/posts/4.jpg" alt="Post" width="250" loading="lazy" class="rounded img-fluid"></div>
 	<div class="col-6">
 		<h4>Features</h4>
 		<p class="text-muted">Just a few mentions, but there is more</p>
@@ -131,9 +131,24 @@ INSERT INTO `menu_item_content` VALUES
 (50,1, 'Vvveb', 'Vvveb', ''),
 (51,1, 'Home', 'Home', ''),
 (52,1, 'Shop', 'Shop', ''),
-(53,1, 'Resources', 'Tag 3', ''),
-(54,1, 'Developer documentation', 'Developer documentation', 'Developer documentation'),
-(55,1, 'User documentation', 'Tag 3', ''),
-(56,1, 'Github', 'Tag 3', ''),
-(57,1, 'Contact', 'Tag 3', ''),
-(58,1, 'Blog', 'Blog', '');
+(74,1, 'Blog', 'Blog', ''),
+(75,1, 'Services', 'Services', ''),
+(76,1, 'About us', 'About us', ''),
+(80,1, 'Marketplace', 'Marketplace', ''),
+
+(53,1, 'Information', 'Information', ''),
+(54,1, 'Delivery Information', 'Delivery Information', 'Delivery Information'),
+(77,1, 'Brands', 'Brands', ''),
+(78,1, 'Vendors', 'Vendors', ''),
+
+(56,1, 'Contact', 'Contact', ''),
+(55,1, 'Terms and conditions', 'Terms and conditions', ''),
+(57,1, 'Contact us', 'Contact us', ''),
+(58,1, 'Portfolio', 'Portfolio', ''),
+(79,1, 'Compare', 'Compare', ''),
+
+(69,1, 'My account', 'My account', ''),
+(70,1, 'Order tracking', 'Order tracking', ''),
+(71,1, 'Wishlist', 'Wishlist', ''),
+(72,1, 'Order history', 'Order history', ''),
+(73,1, 'Returns', 'Returns', '');

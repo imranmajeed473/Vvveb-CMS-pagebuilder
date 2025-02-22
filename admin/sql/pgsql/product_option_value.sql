@@ -17,7 +17,7 @@
 		SELECT product_option_value.*, 
 			   option_value.image, ovc.name, oc.name as "option",
 			   product_option_value.product_option_value_id as array_key
-			FROM product_option_value AS product_option_value
+			FROM product_option_value
 			INNER JOIN option_value ON option_value.option_value_id = product_option_value.option_value_id
 			INNER JOIN option_value_content ovc ON ovc.option_value_id = product_option_value.option_value_id AND ovc.language_id = :language_id
 			INNER JOIN option_content oc ON oc.option_id = product_option_value.option_id AND oc.language_id = :language_id
@@ -77,19 +77,19 @@
 
 	PROCEDURE add(
 		IN product_option_value ARRAY,
-		OUT insert_id
+		OUT fetch_one
 	)
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:product_option_value_data  = @FILTER(:product_option_value, product_option_value);
+		:product_option_value_data  = @FILTER(:product_option_value, product_option_value)
 		
 		
 		INSERT INTO product_option_value 
 			
 			( @KEYS(:product_option_value_data) )
 			
-	  	VALUES ( :product_option_value_data );		
+	  	VALUES ( :product_option_value_data ) RETURNING product_option_value_id;		
 		
 
 	END
@@ -105,7 +105,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		:product_option_value_data = @FILTER(:product_option_value, product_option_value);
+		:product_option_value_data = @FILTER(:product_option_value, product_option_value)
 
 		UPDATE product_option_value
 			

@@ -1,41 +1,50 @@
 //Tables
-function addTemplate(id, name, parent) {
-	// id = attribute-template
+function addTemplate(id, name, parent, element = false, parentElement = "table", container = "tbody", callback) {
+	// id = attribute-template 
 	// name = product_attribute
 	// parent = attribute
-	let template = $("#" + id).clone();
-	$('[type="date"]', template).attr("value", date());
-	$('[type="datetime-local"]', template).attr("value", datetime());
-	$("input,select", template).removeAttr("disabled");
+	let template;
+	let tbody;
+	if (element) {
+		element = element.closest(parentElement);
+	} else {
+		element = document;
+	}
+	template = document.querySelector(id).cloneNode(true);
 	
-	template =template[0].outerHTML;
+	template.querySelectorAll('[type="date"]', template).forEach(e => e.setAttribute("value", date()));
+	template.querySelectorAll('[type="datetime-local"]').forEach(e => e.setAttribute("value", datetime()));
+	template.querySelectorAll("input,select").forEach(e => e.removeAttribute("disabled"));
+	
+	template =template.outerHTML;
 	let newId = Math.floor(Math.random() * 10000);
 	template = template.replaceAll(name + '[0]', name + '[' + newId + ']').
 						replaceAll(name + '[#]', name + '[' + newId + ']').
 						replaceAll(name + '#', name + newId ).
+						replaceAll("[" + name +"][#]", "[" + name +"][" + newId + "]").
 						replace('d-none', '').
 						replace('id="' + id + '"', '');
-	let element = $(template);
-	$("#" + parent + " tbody").append(element);
-	return element;
+	
+	let row = generateElements(template)[0];
+	element.querySelector(parent + " " + container).append(row);
+	
+	if (callback) {
+		callback(row);
+	}
+
+	return row;
 }
 
 function removeRow(element, elementName = false) {
-	let row = $(element).parents("tr");
-	if (elementName) {
-		let form = $(element).parents("form");
-		form.append('<input type="hidden" name="delete[' + elementName + '][]" value="' + row.data("id") + '">');
+	let row = element.closest("tr");
+	if (row && elementName) {
+		let form = element.closest("form");
+		form.append(generateElements('<input type="hidden" name="delete[' + elementName + '][]" value="' + row.dataset.id + '">')[0]);
 	}
 	return row.remove();
 }
 
-
-function clearFeaturedMedia(id = "featured-image") {
-	$("#" + id + "-input").val("");
-	$("#" + id + "-thumb").attr("src","img/placeholder.svg");
-}
-
-const slugify = (str) => {
+function slugify(str) {
 	if (str) {	
 		return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents
 			.replace(/([^\w]+|\s+)/g, '-') // Replace space and other characters by hyphen
@@ -47,42 +56,53 @@ const slugify = (str) => {
 }
 
 
-function addTab(element, event) {
-	let nav = $(element).parents(".nav");
-	let content = $(".tab-content", $(element).parents(".row"));
+function addTab(element, callback) {
+	let nav = element.closest(".nav");
+	let content = element.closest(".row").querySelector(".tab-content");
 
-	let navTemplate = $(".tab-nav-template", nav);
-	let contentTemplate = $(".tab-content-template", content);
+	let navTemplate = nav.querySelector(".tab-nav-template");
+	let contentTemplate = content.querySelector(".tab-content-template");
 	let newId = Math.floor(Math.random() * 10000);
 	
-	navTemplate = navTemplate.clone().removeClass(["tab-nav-template", "d-none"]); 
-	contentTemplate = contentTemplate.clone().removeClass(["tab-content-template", "d-none"]); 
+	navTemplate = navTemplate.cloneNode(true);
+	navTemplate.classList.remove("tab-nav-template", "d-none"); 
+	contentTemplate = contentTemplate.cloneNode(true);
+	contentTemplate.classList.remove("tab-content-template", "d-none"); 
 
-	$("a", navTemplate).attr("href", "#tab-" + newId);
-	contentTemplate.attr("id", "tab-" + newId);
+	navTemplate.querySelector("a").setAttribute("href", "#tab-" + newId);
+	contentTemplate.setAttribute("id", "tab-" + newId);
 
-	contentTemplate = contentTemplate[0].outerHTML;
-	contentTemplate = contentTemplate.replaceAll('[0]', '[' + newId + ']');
+	contentTemplate = contentTemplate.outerHTML;
+	contentTemplate = contentTemplate.replaceAll('[0]', '[' + newId + ']').replaceAll('-0-', '-' + newId + '-').replaceAll('disabled', '');
 
 	nav.append(navTemplate);
-	content.append(contentTemplate);
+	let contentElement = generateElements(contentTemplate)[0];
+	content.append(contentElement);
+
+	if (callback) {
+		callback(navTemplate, contentElement);
+	}
 	
-	$("#tab-" + newId +" .product_option_id").change();
-	$("a", navTemplate)[0].click();
+	document.querySelectorAll("#tab-" + newId +" .product_option_id").forEach(e => {
+		e.dispatchEvent(new Event("change"));
+	});	
+	
+	navTemplate.querySelector("a").click();
 }
 
 function removeTab(element, elementName) {
-	let link = $(element).parents("a");
-	let nav = $(element).parents(".nav");
+	let link = element.closest("a");
+	let nav = element.closest(".nav");
 
 	if (elementName) {
-		let form = $(element).parents("form");
-		form.append('<input type="hidden" name="delete[' + elementName + '][]" value="' + link.data("id") + '">');
+		let form = element.closest("form");
+		form.append(generateElements('<input type="hidden" name="delete[' + elementName + '][]" value="' + link.dataset.id + '">')[0]);
 	}
-	
-	$("a:first", nav).tab('show');
-	$(link.attr("href")).remove();
-	return link.remove();
+
+	const bsTab = bootstrap.Tab.getOrCreateInstance(nav.querySelector(".nav-item:not(.d-none) a"));
+	bsTab.show();
+	document.querySelector(link.getAttribute("href")).remove();
+	return link.parentNode.remove();
 	return false;
 }
 
@@ -109,37 +129,37 @@ function addRow(element) {
 	// id = attribute-template
 	// name = product_attribute
 	// parent = attribute
-	let table = $(element).parents("table");
-	let template = $("tr.template", table).clone().removeClass(["template", "d-none"]);
+	let table = element.closest("table");
+	let template = table.querySelector("tr.template").cloneNode(true);
+	template.classList.remove("template", "d-none");
 	let newId = Math.floor(Math.random() * 10000);
 	
-	
-	$("input,select", template).removeAttr("disabled");
-	template = template[0].outerHTML;
+	template.querySelectorAll("input,select", template).forEach(e => e.removeAttribute("disabled"));
+	template = template.outerHTML;
 	template = template.replaceAll('[0]', '[' + newId + ']').
-						replaceAll('[#]', '[' + newId + ']');
-	//let element = $(template);
-	$("tbody", table).append(template);
+		replaceAll('[#]', '[' + newId + ']');
+	
+	table.querySelector("tbody").append(generateElements(template)[0]);
 	return element;
 }
 
 let optionValues = [];
 
 function optionTypeChange(element) {
-	let tab = $(element).parents(".tab-pane:first");
+	let tab = element.closest(".tab-pane");
 	let optionValueId = element.value;
 	let option = productOption[element.value];
 	let optionType = option['type'];
 	
-	$("a[href='#" + tab.attr("id") + "'] span").text(option['name']);
-	tab.attr("data-type", optionType);
+	document.querySelectorAll("a[href='#" + tab.getAttribute("id") + "'] span").forEach(e => e.textContent = option['name']);
+	tab.setAttribute("data-type", optionType);
 	
 	if (optionType == 'radio' || optionType == 'checkbox' || optionType == 'select') {
-		$(".default", tab).addClass("d-none");
-		$(".values", tab).removeClass("d-none");
+		tab.querySelectorAll(".default").forEach(e => e.classList.add("d-none"));
+		tab.querySelectorAll(".values").forEach(e => e.classList.remove("d-none"));
 	} else {
-		$(".default", tab).removeClass("d-none");
-		$(".values", tab).addClass("d-none");
+		tab.querySelectorAll(".default").forEach(e => e.classList.remove("d-none"));
+		tab.querySelectorAll(".values").forEach(e => e.classList.add("d-none"));
 	}
 	
 	function setValues(values){
@@ -147,13 +167,22 @@ function optionTypeChange(element) {
 			for (id in values) {
 				options += "<option value='"+ id +"'>" + values[id] + "</option>";  
 			}
-			$(".values select.option_value", tab).html(options);
+			tab.querySelector(".values select.option_value", tab).innerHTML = options;
 	}
 	
 	if (!optionValues[optionValueId]) {
-		$.ajax(window.location.pathname + '?module=product/product&action=optionValuesAutocomplete&option_id=' + optionValueId).done(function (values) {
+		fetch(window.location.pathname + '?module=product/product&action=optionValuesAutocomplete&option_id=' + optionValueId)
+		.then((response) => {
+			if (!response.ok) { throw new Error(response) }
+			return response.json()
+		})
+		.then((values) => {
 			optionValues[optionValueId] = values;
-			setValues(values);
+			setValues(values);				
+		})
+		.catch(error => {
+			console.log(error.statusText);
+			displayToast("bg-danger", "Error", "Error saving!");
 		});
 	} else {
 		setValues(optionValues[optionValueId]);
@@ -161,57 +190,97 @@ function optionTypeChange(element) {
 }
 
 // Date
-let datepicker = function () {
-	$(this).daterangepicker({
-		singleDatePicker: true,
-		autoApply: true,
-		autoUpdateInput: false,
-		locale: {
-			format: 'YYYY-MM-DD'
-		}
-	}, function (start, end) {
-		$(this.element).val(start.format('YYYY-MM-DD'));
-	});
+let datepicker = function (e) {
+	let element = e.target.closest('input.date, input[type="date"]');
+	if (element && !element.daterangepicker) {	
+		element.daterangepicker =
+		new DateRangePicker(element, { 
+			singleDatePicker: true,
+			autoApply: true,
+			autoUpdateInput: false,
+			locale: {
+				format: 'YYYY-MM-DD'
+			}
+		}, function (start, end) {
+			this.element.value = start.format('YYYY-MM-DD');
+		});
+	}
 }
 
-$(document).on('focus', 'input.date', datepicker);
-$(document).on('focus', 'input[type="date"]', datepicker);
+document.addEventListener('focusin', datepicker);
+
+// Date range
+let daterangepicker = function (e) {
+	let element = e.target.closest('input.daterange');
+	if (element && !element.daterangepicker) {	
+		element.daterangepicker =
+		new DateRangePicker(element, { 
+			singleDatePicker: false,
+			autoApply: true,
+			//autoUpdateInput: false,
+			locale: {
+				format: 'YYYY-MM-DD'
+			}
+		}/*, function (start, end) {
+			this.element.value = start.format('YYYY-MM-DD') + " - " + end.format('YYYY-MM-DD');
+		}*/);
+	}
+}
+
+document.addEventListener('focusin', daterangepicker);
 
 // Time
-let timepicker = function () {
-	$(this).daterangepicker({
-		singleDatePicker: true,
-		datePicker: false,
-		autoApply: true,
-		autoUpdateInput: false,
-		timePicker: true,
-		timePicker24Hour: true,
-		locale: {
-			format: 'HH:mm'
-		}
-	}, function (start, end) {
-		$(this.element).val(start.format('HH:mm'));
-	}).on('show.daterangepicker', function (ev, picker) {
-		picker.container.find('.calendar-table').hide();
-	});
+let timepicker = function (e) {
+	let element = e.target.closest('input.time');
+	if (element && !element.daterangepicker) {	
+		element.daterangepicker =
+		new DateRangePicker(element, {
+			singleDatePicker: true,
+			datePicker: false,
+			autoApply: true,
+			autoUpdateInput: false,
+			timePicker: true,
+			timePicker24Hour: true,
+			locale: {
+				format: 'HH:mm'
+			}
+		}, function (start, end) {
+			this.element.value =  start.format('HH:mm');
+		});
+		
+		element.addEventListener('show.daterangepicker', function (ev, picker) {
+			picker.container.querySelectorAll('.calendar-table').forEach(e => e.style.display = "none");
+		});
+	}
 }
 
-$(document).on('focus', 'input.time', timepicker);
+document.addEventListener('focusin', timepicker);
 
 // Date Time
-let datetimepicker = function () {
-	$(this).daterangepicker({
-		singleDatePicker: true,
-		autoApply: true,
-		autoUpdateInput: false,
-		timePicker: true,
-		timePicker24Hour: true,
-		locale: {
-			format: 'YYYY-MM-DD HH:mm'
-		}
-	}, function (start, end) {
-		$(this.element).val(start.format('YYYY-MM-DD HH:mm'));
-	});
+let datetimepicker = function (e) {
+	let element = e.target.closest('input.datetime');
+	if (element && !element.daterangepicker) {	
+		element.daterangepicker =
+		new DateRangePicker(element, {
+			singleDatePicker: true,
+			autoApply: true,
+			autoUpdateInput: false,
+			timePicker: true,
+			timePicker24Hour: true,
+			locale: {
+				format: 'YYYY-MM-DD HH:mm'
+			}
+		}, function (start, end) {
+			this.element.value =  start.format('YYYY-MM-DD HH:mm');
+		});
+	}
 }
 
-$(document).on('focus', 'input.datetime', datetimepicker);
+document.addEventListener('focusin', datetimepicker);
+
+
+function generateElements(html) {
+  const template = document.createElement('template');
+  template.innerHTML = html.trim();
+  return template.content.children;
+}

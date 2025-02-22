@@ -36,7 +36,7 @@ class Categories extends Base {
 			echo __('Item removed!');
 		}
 
-		die();
+		die(0);
 	}
 
 	function reorder() {
@@ -48,11 +48,12 @@ class Categories extends Base {
 			echo __('Items reordered!');
 		}
 
-		die();
+		die(0);
 	}
 
 	function add() {
-		$data = $this->request->post;
+		$data                = $this->request->post;
+		$data['taxonomy_id'] = $data['taxonomy_id'] ?? $this->request->get['taxonomy_id'];
 
 		$categories  = new categorySQL();
 
@@ -75,7 +76,7 @@ class Categories extends Base {
 			}
 		}
 
-		die();
+		die(0);
 
 		return;
 	}
@@ -85,14 +86,14 @@ class Categories extends Base {
 		$categories  = new categorySQL();
 
 		$page        = $this->request->get['page'] ?? 1;
-		$type        = $this->request->get['type'] ?? 1;
+		$type        = $this->request->get['type'] ?? '';
+		$taxonomy_id = $this->request->get['taxonomy_id'];
 		$limit       = 1000;
-		$taxonomy_id = 1;
 
 		$options = [
 			'start'       => ($page - 1) * $limit,
 			'limit'       => $limit,
-			//'taxonomy_id' => $taxonomy_id,
+			'taxonomy_id' => $taxonomy_id,
 			'post_type'   => $type,
 			'type'        => 'categories',
 		] + $this->global;

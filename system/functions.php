@@ -34,10 +34,15 @@ function url($parameters, $mergeParameters = false, $useCurrentUrl = true) {
 		if (isset($mergeParameters['host'])) {
 			$result .= '//' . \Vvveb\System\Sites::url($mergeParameters['host']);
 			unset($mergeParameters['host']);
+
+			if (isset($mergeParameters['scheme'])) {
+				$result = $mergeParameters['scheme'] . ":$result";
+				unset($mergeParameters['scheme']);
+			}
 		}
 
 		$url = System\Routes::url($parameters, $mergeParameters);
-		$result .= $url ?? '';
+		$result .= (V_SUBDIR_INSTALL ? V_SUBDIR_INSTALL : '') . ($url ?? '');
 	} else {
 		static $url       = '';
 		static $urlParams = [];
@@ -71,12 +76,21 @@ function url($parameters, $mergeParameters = false, $useCurrentUrl = true) {
 		if (isset($parameters['host'])) {
 			$result .= '//' . \Vvveb\System\Sites::url($parameters['host']);
 			unset($parameters['host']);
+
+			if (isset($parameters['scheme'])) {
+				$result = $parameters['scheme'] . ":$result";
+				unset($parameters['scheme']);
+			}
+		} else {
+			if (! $useCurrentUrl) {
+				$result .= (V_SUBDIR_INSTALL ? V_SUBDIR_INSTALL : '');
+			}
 		}
 
 		$result .= ($useCurrentUrl ? $url['path'] ?? '' : '') . ($parameters ? '?' . urldecode(http_build_query($parameters)) : '');
 	}
 
-	return $result;
+	return  $result;
 }
 
 function config($key = null, $default = null) {
@@ -87,39 +101,87 @@ function config($key = null, $default = null) {
 	return System\Config::getInstance()->get($key, $default);
 }
 
-function get_config($key = null, $default = null) {
+function getConfig($key = null, $default = null) {
 	return System\Config::getInstance()->get($key, $default);
 }
 
-function set_config($key, $value = null) {
+function setConfig($key, $value = null) {
 	return System\Config::getInstance()->set($key, $value);
 }
 
-function unset_config($key) {
+function unsetConfig($key) {
 	return System\Config::getInstance()->unset($key);
 }
 
-function get_setting($namespace, $key = null, $default = null, $site_id = SITE_ID) {
+//setting
+function getSetting($namespace, $key = null, $default = null, $site_id = SITE_ID) {
 	return System\Setting::getInstance()->get($namespace, $key, $default, $site_id);
 }
 
-function set_setting($namespace, $key = null, $value = null, $site_id = SITE_ID) {
+function setSetting($namespace, $key = null, $value = null, $site_id = SITE_ID) {
 	return System\Setting::getInstance()->set($namespace, $key, $value, $site_id);
 }
 
-function delete_setting($namespace, $key = null, $site_id = SITE_ID) {
-	return System\Setting::getInstance()->delete($namespace, $key, $value, $site_id);
+function deleteSetting($namespace, $key = null, $site_id = SITE_ID) {
+	return System\Setting::getInstance()->delete($namespace, $key, $site_id);
 }
 
-function set_settings($namespace, $settings, $site_id = SITE_ID) {
-	return System\Setting::getInstance()->multiSet($namespace, $settings, $site_id);
+function setMultiSetting($namespace, $settings, $site_id = SITE_ID) {
+	return System\Setting::getInstance()->setMulti($namespace, $settings, $site_id);
+}
+
+//setting content
+function getMultiSettingContent($site_id, $namespace, $key = null, $default = null, $language_id = false) {
+	return System\Meta\SettingContent::getInstance()->getMulti($site_id, $namespace, $key, $default, $language_id);
+}
+
+function setMultiSettingContent($site_id, $meta) {
+	return System\Meta\SettingContent::getInstance()->setMulti($site_id, $meta);
+}
+
+// post meta
+function getPostMeta($post_id, $namespace, $key = null, $default = null) {
+	return System\Meta\PostMeta::getInstance()->get($post_id, $namespace, $key, $default);
+}
+
+function setPostMeta($post_id, $namespace, $key = null, $value = null) {
+	return System\Meta\PostMeta::getInstance()->set($post_id, $namespace, $key, $value);
+}
+
+function deletePostMeta($post_id, $namespace, $key = null) {
+	return System\Meta\PostMeta::getInstance()->delete($post_id, $namespace, $key);
+}
+
+function setMultiPostMeta($post_id, $namespace, $meta) {
+	return System\Meta\PostMeta::getInstance()->setMulti($post_id, $namespace, $meta);
+}
+
+// post meta content
+function getPostContentMeta($post_id, $namespace, $key = null, $default = null, $language_id = false) {
+	return System\Meta\PostContentMeta::getInstance()->get($post_id, $namespace, $key, $default, $language_id);
+}
+
+function getMultiPostContentMeta($post_id, $namespace, $key = null, $default = null, $language_id = false) {
+	return System\Meta\PostContentMeta::getInstance()->getMulti($post_id, $namespace, $key, $default, $language_id);
+}
+
+function setPostContentMeta($post_id, $namespace, $key = null, $value = null, $language_id = false) {
+	return System\Meta\PostContentMeta::getInstance()->set($post_id, $namespace, $key, $value, $language_id);
+}
+
+function deletePostContentMeta($post_id, $namespace, $key = null, $language_id = false) {
+	return System\Meta\PostContentMeta::getInstance()->delete($post_id, $namespace, $key, $language_id);
+}
+
+function setMultiPostContentMeta($post_id, $meta) {
+	return System\Meta\PostContentMeta::getInstance()->setMulti($post_id, $meta);
 }
 
 function getCurrentTemplate() {
 	return System\Core\View :: getInstance()->template();
 }
 
-function getUrlTemplate($url) {
+function getUrlRoute($url) {
 	$urlData = \Vvveb\System\Routes::getUrlData($url);
 
 	return $urlData;
@@ -269,6 +331,10 @@ function filterText($data) {
 function session($data, $default = null) {
 	$session = System\Session :: getInstance();
 
+	if (! $session) {
+		return $default;
+	}
+
 	if (is_array($data)) {
 		foreach ($data as $key => $value) {
 			$session->set($key, $value);
@@ -378,7 +444,11 @@ function arrayPath(array $a, $path, $default = null, $token = '.') {
 }
 
 function humanReadable($text) {
-	return ucfirst(str_replace(['_', '-', '/', '[', ']', '.'], [' ', ' ', ' - ', ' ', ' ', ' '], trim($text, ' /\-_')));
+	if (is_string($text)) {
+		return ucfirst(str_replace(['_', '-', '/', '[', ']', '.'], [' ', ' ', ' - ', ' ', ' ', ' '], trim($text, ' /\-_')));
+	}
+
+	return $text;
 }
 
 function cleanUrl($text, $divider = '-') {
@@ -394,6 +464,9 @@ function cleanUrl($text, $divider = '-') {
 }
 
 function slugify($text, $divider = '-') {
+	if (! $text) {
+		return $text;
+	}
 	// replace non letter or digits by divider
 	$text = preg_replace('/[^\pL\d]+/u', $divider, $text);
 
@@ -431,11 +504,15 @@ if (function_exists('_')) {
 	function __($text, $plural = false, $count = false) {
 		global $vvvebTranslationDomains;
 
+		$text = substr($text, 0, 1024);
+
 		if ($plural) {
+			$plural = substr($plural, 0, 1024);
+
 			foreach ($vvvebTranslationDomains as $domain) {
 				$translation = dngettext($domain, $text, $plural, $count);
 
-				if ($translation != $text) {
+				if ($translation && ($translation != $text)) {
 					break;
 				}
 			}
@@ -443,7 +520,7 @@ if (function_exists('_')) {
 			foreach ($vvvebTranslationDomains as $domain) {
 				$translation = dgettext($domain, $text);
 
-				if ($translation != $text) {
+				if ($translation && ($translation != $text)) {
 					break;
 				}
 			}
@@ -670,9 +747,9 @@ function getActionName() {
  * @return
  *   The new array if the key exists, otherwise the unchanged array.
  *
- * @see array_insert_after()
+ * @see arrayInsertAfter()
  */
-function array_insert_before($key, array &$array, $new_key, $new_value) {
+function arrayInsertBefore($key, array &$array, $new_key, $new_value) {
 	if (array_key_exists($key, $array)) {
 		$new = [];
 
@@ -704,9 +781,9 @@ function array_insert_before($key, array &$array, $new_key, $new_value) {
  * @return
  *   The new array if the key exists, otherwise the unchanged array.
  *
- * @see array_insert_after()
+ * @see arrayInsertAfter()
  */
-function array_insert_array_before($key, array &$array, $new_array) {
+function arrayInsertArrayBefore($key, array &$array, $new_array) {
 	if (array_key_exists($key, $array)) {
 		$new = [];
 
@@ -738,9 +815,9 @@ function array_insert_array_before($key, array &$array, $new_array) {
  * @return
  *   The new array if the key exists, otherwise the unchanged array.
  *
- * @see array_insert_before()
+ * @see arrayInsertBefore()
  */
-function array_insert_after($key, array &$array, $new_key, $new_value) {
+function arrayInsertAfter($key, array &$array, $new_key, $new_value) {
 	if (array_key_exists($key, $array)) {
 		$new = [];
 
@@ -773,9 +850,9 @@ function array_insert_after($key, array &$array, $new_key, $new_value) {
  * @return
  *   The new array if the key exists, otherwise the unchanged array.
  *
- * @see array_insert_before()
+ * @see arrayInsertBefore()
  */
-function array_insert_array_after($key, array &$array, $new_array) {
+function arrayInsertArrayAfter($key, array &$array, $new_array) {
 	if (array_key_exists($key, $array)) {
 		$new = [];
 
@@ -807,7 +884,7 @@ function isEditor() {
 	return isset($_GET['r']);
 }
 
-function log_error($message) {
+function logError($message) {
 	error_log($message);
 }
 
@@ -818,7 +895,7 @@ function getThemeFolderList($theme = false) {
 		$theme = \Vvveb\System\Sites::getTheme() ?? 'default';
 	}
 
-	$themeFolder = DIR_THEMES . DS . $theme;
+	$themeFolder = DIR_THEMES . $theme;
 	$files       = glob("$themeFolder/*", GLOB_ONLYDIR);
 	$pages['/']  = ['name' => '/', 'title' => '/', 'filename' => '/', 'file' => '/', 'path' => '/', 'folder' => $theme];
 
@@ -838,6 +915,26 @@ function getThemeFolderList($theme = false) {
 	return $pages;
 }
 
+function getDefaultTemplateList() {
+	return [
+		'index.html',
+		'index.coming-soon.html',
+		'index.maintenance.html',
+		'blank.html',
+		'error404.html',
+		'error500.html',
+		'contact.html',
+		'search/index.html',
+		'content/post.html',
+		'content/page.html',
+		'content/index.html',
+		'content/category.html',
+		'product/index.html',
+		'product/product.html',
+		'product/category.html',
+	];
+}
+
 function getTemplateList($theme = null, $skip = []) {
 	$friendlyNames =  [
 		'index'                     => ['name' =>  __('Home page'), 'description'         =>  __('Website homepage'), 'global' => true],
@@ -855,21 +952,22 @@ function getTemplateList($theme = null, $skip = []) {
 		'user-index'                => ['name' =>  __('Dashboard'), 'description'         =>  __('User dashboard'), 'global' => true],
 	];
 
-	$pagesSortOrder = ['index' => '', 'contact' => '', 'blank' => '', 'error404' => '', 'error500' => ''];
 	$skipFolders    = array_merge(['src', 'source', 'backup', 'sections', 'blocks', 'inputs', 'css', 'scss', 'screenshots', 'locale', 'node_modules'], $skip);
 
 	if (! $theme) {
 		$theme = \Vvveb\System\Sites::getTheme() ?? 'default';
 	}
 	$pages       = [];
-	$themeFolder = DIR_THEMES . DS . $theme;
-	$files       = glob("$themeFolder/{,*/*/,*/}*.html", GLOB_BRACE);
+	$themeFolder = DIR_THEMES . $theme;
+	//$files       = glob("$themeFolder/{,*/*/,*/}*.html", GLOB_BRACE);
+	$glob        = ['', '*/*/', '*/'];
+	$files       = globBrace($themeFolder . DS, $glob, '*.html');
 
 	foreach ($files as $file) {
-		$file     = preg_replace('@^.*/themes/[^/]+/@', '', $file);
+		$file     = preg_replace('@^.*[\\\/]themes[\\\/][^\\\/]+[\\\/]@', '', $file);
 		$filename = basename($file);
 
-		$folder   = \Vvveb\System\Functions\Str::match('@(\w+)/.*?$@', $file);
+		$folder   = \Vvveb\System\Functions\Str::match('@(\w+)/.*?$@', $file) ?? '/';
 		$path     = \Vvveb\System\Functions\Str::match('@(\w+)/.*?$@', $file);
 
 		if (in_array($folder, $skipFolders)) {
@@ -877,7 +975,7 @@ function getTemplateList($theme = null, $skip = []) {
 		}
 		$name        = $title       = str_replace('.html', '', $filename);
 		$description = '';
-		$name        = ! empty($folder) ? "$folder-$name" : $name;
+		$name        = (! empty($folder) && $folder != '/') ? "$folder-$name" : $name;
 
 		if (isset($friendlyNames[$name])) {
 			if (isset($friendlyNames[$name]['description'])) {
@@ -896,13 +994,16 @@ function getTemplateList($theme = null, $skip = []) {
 		}
 	}
 
-	//$pagesSortOrder = array_flip(array_keys($this->friendlyNames));
-	$pages = array_filter(array_merge($pagesSortOrder, $pages));
+	//ksort($pages);
 
 	return $pages;
 }
 
 function sanitizeFileName($file) {
+	if (! $file) {
+		return $file;
+	}
+
 	//sanitize, remove double dot .. and remove get parameters if any
 	$file = preg_replace('@\?.*$|\.{2,}|[^\/\\a-zA-Z0-9\-\._]@' , '', $file);
 	$file = preg_replace('@[^\/\w\s\d\.\-_~,;:\[\]\(\)\\]|[\.]{2,}@', '', $file);
@@ -924,10 +1025,30 @@ function formatBytes($bytes) {
 	return round($bytes, 2) . ' ' . $units[$i] . 'B';
 }
 
+function isController($name, $app = APP) {
+	$file   = DIR_ROOT . $app . DS . 'controller' . DS . strtolower($name) . '.php';
+	$exists = file_exists($file);
+
+	return $exists;
+}
+
+function isModel($name, $app = APP) {
+	$file   = DIR_ROOT . $app . DS . 'sql' . DS . DB_ENGINE . DS . $name;
+	$exists = file_exists($file);
+
+	return $exists;
+}
+
 function model($model) {
 	$modelClass = 'Vvveb\Sql\\' . ucwords($model) . 'SQL';
 
 	return new $modelClass();
+}
+
+function controller($name) {
+	$controllerClass = 'Vvveb\Controller\\' . ucwords($name);
+
+	return new $controllerClass();
 }
 
 function d(...$variables) {
@@ -941,7 +1062,7 @@ function dd(...$variables) {
 		echo highlight_string("<?php\n" . var_export($variable, true), true);
 	}
 
-	die();
+	die(0);
 }
 
 function encrypt($key, $value, $cipher = 'aes-256-gcm', $digest = 'sha256') {
@@ -1025,7 +1146,8 @@ function sanitizeHTML($string) {
 	do {
 		// Remove really unwanted tags
 		$old_data = $string;
-		$string   = preg_replace('#</*(?:applet|b(?:ase|gsound|link)|embed|frame(?:set)?|i(?:frame|layer)|l(?:ayer|ink)|meta|object|s(?:cript|tyle)|title|xml)[^>]*+>#i', '', $string);
+		//$string   = preg_replace('#</*(?:applet|b(?:ase|gsound|link)|embed|frame(?:set)?|i(?:frame|layer)|l(?:ayer|ink)|meta|object|s(?:cript|tyle)|title|xml)[^>]*+>#i', '', $string);
+		$string   = preg_replace('#</*(?:applet|b(?:ase|gsound|link)|embed|frame(?:set)?|i(?:layer)|l(?:ayer|ink)|meta|object|s(?:cript|tyle)|title|xml)[^>]*+>#i', '', $string);
 	} while ($string !== $string);
 
 	return $string;
@@ -1180,7 +1302,15 @@ function getLanguage() {
 	return session('language', 'en_US');
 }
 
-function siteSettings($site_id = SITE_ID) {
+function getLanguageId() {
+	return session('language_id', 1);
+}
+
+function getCurrency() {
+	return session('currency', 'USD');
+}
+
+function siteSettings($site_id = SITE_ID, $language_id = false) {
 	$cache     = System\Cache::getInstance();
 	$site      = $cache->cache(APP,'site.' . $site_id, function () use ($site_id) {
 		$siteSql             = new Sql\SiteSQL();
@@ -1188,6 +1318,7 @@ function siteSettings($site_id = SITE_ID) {
 
 		if ($site && isset($site['settings'])) {
 			$settings = json_decode($site['settings'], true);
+			$siteData = $siteSql->getSiteData(['site' => $settings]);
 
 			foreach (['favicon', 'logo', 'logo-sticky', 'logo-dark', 'logo-dark-sticky'] as $img) {
 				if (isset($settings[$img])) {
@@ -1196,11 +1327,15 @@ function siteSettings($site_id = SITE_ID) {
 				}
 			}
 
-			return $settings;
+			return $settings + $siteData;
 		}
 
 		return [];
 	}, 259200);
+
+	if ($language_id && $site) {
+		$site['description'] = $site['description'][$language_id] ?? $site['description'][1] ?? '';
+	}
 
 	return $site;
 }
@@ -1262,8 +1397,8 @@ function email($to, $subject, $template, $data = [], $config = []) {
 	}
 
 	//get site contact email for sender and reply to
-	$site   = siteSettings();
-	$sender = $config['sender'] ?? $site['title'];
+	$site   = siteSettings(SITE_ID, session('language_id') ?? 1);
+	$sender = $config['sender'] ?? $site['description']['title'];
 	$from   = $config['from'] ?? $site['contact-email'];
 	$reply  = $config['reply'] ?? $site['contact-email'];
 
@@ -1286,6 +1421,8 @@ function rrmdir($src, $skip = []) {
 
 	$dir = @opendir($src);
 
+	$result = false;
+
 	if ($dir) {
 		while (false !== ($file = readdir($dir))) {
 			$full = $src . DS . $file;
@@ -1294,9 +1431,13 @@ function rrmdir($src, $skip = []) {
 				($file != '..')/* &&
 				(! in_array($full, $skip))*/) {
 				if (is_dir($full)) {
-					rrmdir($full);
+					$result = rrmdir($full);
 				} else {
-					unlink($full);
+					$result = @unlink($full);
+				}
+
+				if (! $result) {
+					break;
 				}
 			}
 		}
@@ -1306,7 +1447,7 @@ function rrmdir($src, $skip = []) {
 		return rmdir($src);
 	}
 
-	return false;
+	return result;
 }
 
 /* Recursive copy */
@@ -1315,27 +1456,61 @@ function rcopy($src, $dst, $skip = [], $overwrite = true) {
 		//rrmdir($dst);
 	}
 
+	$result = true;
+
 	if (is_dir($src)) {
 		if (! file_exists($dst)) {
-			mkdir($dst);
+			$result = @mkdir($dst);
+
+			if (! $result) {
+				return false;
+			}
 		}
+
+		@chmod($dst, 0755);
+
 		$files = scandir($src);
 
 		foreach ($files as $file) {
 			$full = $src . DS . $file;
-			error_log($full);
 
 			if ($file != '.' &&
 				$file != '..' &&
 				! in_array($file, $skip)) {
-				rcopy($full, $dst . DS . $file);
+				if (is_dir($full)) {
+					$result = rcopy($full, $dst . DS . $file);
+				} else {
+					$result = @copy($full, $dst . DS . $file);
+
+					if (! $result) {
+						if (@chmod($dst . DS . $file, 0644)) {
+							$result = @copy($full, $dst . DS . $file);
+						}
+					}
+				}
+
+				if (! $result) {
+					return false;
+				}
 			}
 		}
 	} else {
 		if (file_exists($src)) {
-			copy($src, $dst);
+			$result = @copy($src, $dst);
+
+			if (! $result) {
+				if (@chmod($dst, 0644)) {
+					$result = copy($src, $dst);
+				}
+			}
+
+			if (! $result) {
+				return false;
+			}
 		}
 	}
+
+	return $result;
 }
 
 /* Recursive copy */
@@ -1366,12 +1541,18 @@ function rrename($src, $dst, $skip = []) {
 function download($url) {
 	$result = false;
 
+	$url = html_entity_decode($url);
+
 	if (function_exists('curl_init')) {
 		$ch = curl_init($url);
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-		curl_setopt($ch, CURLOPT_FAILONERROR, true);
-		$result = curl_exec($ch);
-		curl_close($ch);
+
+		if ($ch) {
+			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+			curl_setopt($ch, CURLOPT_FAILONERROR, true);
+			curl_setopt($ch, CURLOPT_USERAGENT, $_SERVER['HTTP_USER_AGENT'] ?? 'Vvveb ' . V_VERSION);
+			$result = curl_exec($ch);
+			curl_close($ch);
+		}
 	} else {
 		if (ini_get('allow_url_fopen') == '1') {
 			$context_options = [
@@ -1388,7 +1569,7 @@ function download($url) {
 	return $result;
 }
 
-function getUrl($url, $cache = true, $expire = 0) {
+function getUrl($url, $cache = true, $expire = 604800, $timeout = 5, $exception = true) {
 	$cacheDriver  = System\Cache :: getInstance();
 	$cacheKey     = md5($url);
 	$result       = false;
@@ -1397,44 +1578,69 @@ function getUrl($url, $cache = true, $expire = 0) {
 		return $result;
 	} else {
 		$result = false;
-		//try with file get contents
-		if (ini_get('allow_url_fopen') == '1') {
-			$context_options = [
-				'http' => [
-					'timeout'       => 5,
-					'ignore_errors' => 1,
-				],
-			];
-			$context         = stream_context_create($context_options);
-			$result          = @file_get_contents($url, false, $context);
-		}
+		$url    = html_entity_decode($url);
+		//try with curl
+		if (function_exists('curl_init')) {
+			$ch = curl_init($url);
 
-		if ($result) {
-			if ($cache) {
-				$cacheDriver->set('url', $cacheKey, $result);
+			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+			curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+			curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
+			curl_setopt($ch, CURLOPT_USERAGENT, $_SERVER['HTTP_USER_AGENT'] ?? 'Vvveb ' . V_VERSION);
+
+			if (DEBUG) {
+				curl_setopt($ch, CURLOPT_VERBOSE, true);
+				$streamVerboseHandle = fopen('php://temp', 'w+');
+				curl_setopt($ch, CURLOPT_STDERR, $streamVerboseHandle);
 			}
+			$result = curl_exec($ch);
 
-			return $result;
-		} else {
-			//try with curl
-			if (function_exists('curl_init')) {
-				$ch = curl_init($url);
+			if ($result) {
+				if ($cache) {
+					$cacheDriver->set('url', $cacheKey, $result);
+				}
 
-				curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-				$result = curl_exec($ch);
-				curl_close($ch);
+				return $result;
+			} else {
+				if ($exception) {
+					$message = 'Curl error: ' . curl_errno($ch) . ' - ' . curl_error($ch);
 
-				if ($result) {
-					if ($cache) {
-						$cacheDriver->set('url', $cacheKey, $result);
+					if (DEBUG) {
+						$message .= "\n" . print_r(curl_getinfo($ch), 1);
+						rewind($streamVerboseHandle);
+						$message .= "\n" . stream_get_contents($streamVerboseHandle);
 					}
 
-					return $result;
-				} else {
-					throw new \Exception('Curl error: ' . curl_errno($ch) . ' - ' . curl_error($ch));
-
-					return [];
+					throw new \Exception($message);
 				}
+			}
+
+			curl_close($ch);
+		} else {
+			//try with file get contents
+			if (ini_get('allow_url_fopen') == '1') {
+				$context_options = [
+					'http' => [
+						'timeout'       => $timeout,
+						'ignore_errors' => 1,
+					],
+				];
+
+				$context         = stream_context_create($context_options);
+
+				if ($exception) {
+					$result = file_get_contents($url, false, $context);
+				} else {
+					$result = @file_get_contents($url, false, $context);
+				}
+			}
+
+			if ($result) {
+				if ($cache) {
+					$cacheDriver->set('url', $cacheKey, $result);
+				}
+
+				return $result;
 			}
 		}
 	}
@@ -1482,15 +1688,50 @@ function nl2p($string) {
 
 function orderStatusBadgeClass($order_status_id = 1) {
 	$classes = [
-		1 => 'bg-primary-subtle text-body',
-		2 => 'bg-success-subtle text-body',
-		3 => 'bg-danger-subtle text-body',
-		4 => 'bg-success',
-		5 => 'bg-danger',
-		6 => 'bg-danger',
+		1 => 'bg-primary-subtle text-body', //pending
+		2 => 'bg-info-subtle text-body', //processing
+		3 => 'bg-primary', //processed
+		4 => 'bg-success', //complete
+		5 => 'bg-danger', //canceled
+		6 => 'bg-secondary', //archived
+		7 => 'bg-warning', //requires_action
 	];
 
 	return $classes[$order_status_id] ?? 'bg-warning text-dark';
+}
+
+function paymentStatusBadgeClass($payment_status_id = 1) {
+	$classes = [
+		1  => 'bg-warning-subtle text-body', //not_paid
+		2  => 'bg-success-subtle text-body', //awaiting
+		3  => 'bg-danger-subtle text-body', //captured
+		4  => 'bg-success', //paid
+		5  => 'bg-danger', //canceled
+		6  => 'bg-danger', //refunded
+		7  => 'bg-danger', //partially_refunded
+		8  => 'bg-danger', //chargeback
+		9  => 'bg-danger', //requires_action
+		10 => 'bg-danger', //fraud
+	];
+
+	return $classes[$payment_status_id] ?? 'bg-warning text-dark';
+}
+
+function shippingStatusBadgeClass($shipping_status_id = 1) {
+	$classes = [
+		1  => 'bg-warning-subtle text-body', //not_fulfilled
+		2  => 'bg-success-subtle text-body', //fulfilled
+		3  => 'bg-success-subtle text-body', //partially_fulfilled
+		4  => 'bg-success', //shipped
+		5  => 'bg-success-subtle text-body', //partially_shipped
+		6  => 'bg-danger-subtle text-body', //returned
+		7  => 'bg-danger-subtle text-body', //partially_returned
+		8  => 'bg-success', //delivered
+		9  => 'bg-danger', //canceled
+		10 => 'bg-warning', //requires_action
+	];
+
+	return $classes[$shipping_status_id] ?? 'bg-warning text-dark';
 }
 
 function commentStatusBadgeClass($status = 0) {
@@ -1508,7 +1749,7 @@ function globBrace($path, $glob, $filename = '') {
 	//$glob = ['*','*/*','*/*/*'];
 	$files = [];
 
-	if (false && defined('GLOB_BRACE')) {
+	if (defined('GLOB_BRACE')) {
 		$path .= '{' . implode(',', $glob) . '}' . $filename;
 		$files = glob($path, GLOB_BRACE);
 	} else {
@@ -1537,7 +1778,10 @@ function randomDigits($length) {
 }
 
 function invoiceFormat($format, $data) {
-	$data += ['date_added' => time(), 'year' => date('Y'), 'month' => date('M'), 'day' => date('d')];
+	if (! $format) {
+		return '';
+	}
+	$data += ['date_added' => time(), 'year' => date('Y'), 'year2' => date('y'), 'month_name' => date('M'), 'month' => date('m'), 'day' => date('d')];
 
 	return preg_replace_callback('/{(.+?)}/', function ($matches) use ($data) {
 		$key = $matches[1];
@@ -1546,12 +1790,280 @@ function invoiceFormat($format, $data) {
 			return $data[$key];
 		}
 
-		if (strpos($key, 'random-') !== false) {
-			$length = (int) str_replace('random-', '', $key);
+		if (strpos($key, 'rand-no-') !== false) {
+			$length = (int) str_replace('rand-no-', '', $key);
 
 			return randomDigits($length);
 		}
 
+		if (strpos($key, 'rand-str-') !== false) {
+			$length = (int) str_replace('rand-str-', '', $key);
+
+			return strtoupper(System\Functions\Str::random($length));
+		}
+
 		return $matches[0];
 	}, $format);
+}
+
+function array2xml($array, $xml = false) {
+	if ($xml === false) {
+		$xml = new \SimpleXMLElement('<root/>');
+	}
+
+	foreach ($array as $key => $value) {
+		$attributes  = [];
+		$processAttr = function (&$key) use (&$attributes) {
+			$i     = 0;
+			$start = 0;
+
+			if ($key) {
+				while (($start = strpos($key, '@@', $start))) {
+					$i++;
+					$start += 2;
+					$end  = (int)strpos($key,' ', $start);
+					$name = substr($key, $start, $end ? $end - $start : null);
+
+					if ($end == 0) {
+						$start += strlen($name);
+					} else {
+						$start = (int)$end;
+					}
+
+					if ($name) {
+						$name                 = explode('=', $name);
+						$attributes[$name[0]] = trim($name[1] ?? '', '\'"');
+					}
+				}
+
+				$key = strstr($key, ' @@', true) ?: $key;
+			}
+		};
+
+		$processAttr($key);
+
+		if (is_array($value) || is_object($value)) {
+			$node = $xml->addChild($key);
+
+			if ($attributes) {
+				foreach ($attributes as $key => $val) {
+					$node->addAttribute($key, htmlentities($val));
+				}
+			}
+			array2xml($value, $node);
+		} else {
+			if (substr_compare($key, '--xmlattr', -9, 9) === 0) {
+				$key = substr($key, 0, -9);
+				$xml->addAttribute($key, htmlentities($value));
+			} else {
+				$processAttr($value);
+
+				if ($value && is_string($value)) {
+					$value = htmlentities($value);
+				}
+				$node = $xml->addChild($key, $value);
+
+				if ($attributes) {
+					foreach ($attributes as $key => $val) {
+						$node->addAttribute($key, $val);
+					}
+				}
+			}
+		}
+	}
+
+	return $xml->asXML();
+}
+
+function removeJsonComments($json) {
+	$json = preg_replace('@^\s*//.*([\r\n]|\s)*|^\s*/\*([\r\n]|.)*?\*/([\r\n]|\s)*@m', '', $json);
+
+	return $json;
+}
+
+function encodeXmlName($name) {
+	$len     = strlen($name);
+	$newName = '';
+
+	for ($i = 0; $i < $len; $i++) {
+		$char = $name[$i];
+		$code = ord($char);
+
+		// = @ _ - . A-Z a-z 0-9
+		if (! ($code == 32 || $code == 34 || $code == 61 || $code == 64 || $code == 95 || $code == 45 || $code == 46 || ($code <= 90 && $code >= 65) || ($code <= 122 && $code >= 97) || ($code <= 57 && $code >= 48))) {
+			$char = '_x' . sprintf('%03d', $code) . '_';
+		}
+
+		$newName .= $char;
+	}
+
+	return $newName;
+}
+
+function decodeXmlName($name) {
+	return preg_replace_callback('/_x(\d+)_/',function ($matches) {
+		return chr(ltrim($matches[1], '0'));
+	}, $name);
+}
+
+function prepareJson($array) {
+	if (! is_array($array)) {
+		//return;
+	}
+	$helper = [];
+
+	foreach ($array as $key => $value) {
+		if (is_numeric($key)) {
+			$key = 'n--' . $key;
+		}
+
+		if ($key[0] == '@') {
+			if ($key[1] == '@') {
+				$key = substr($key, 2) . '--xmlattr';
+			} else {
+				$key = substr($key, 1) . '--attr';
+			}
+		}
+
+		if (strpos($key, '@')) {
+		}
+
+		//keep empty arrays as array type
+		if (is_object($value) && ! $value) {
+			$key .= '--object';
+		} else {
+			if (is_array($value) && ! $value) {
+				$key .= '--array';
+			}
+		}
+
+		//keep boolean type
+		if (is_bool($value)) {
+			$key .= '--boolean';
+		}
+
+		//keep int type
+		if (is_int($value)) {
+			$key .= '--int';
+		}
+
+		//keep null type
+		if ($value === null) {
+			$key .= '--null';
+		}
+
+		$key = encodeXmlName(trim($key));
+
+		$helper[$key] = is_array($value) ? prepareJson($value) : $value;
+	}
+
+	return $helper;
+}
+
+function reconstructJson(&$array, $removeAttrs = false) {
+	if (! is_iterable($array)) {
+		return;
+	}
+	$helper = [];
+	$array  = (array)$array;
+
+	foreach ($array as $key => $value) {
+		if ($removeAttrs && $key == '@attributes') {
+			continue;
+		}
+
+		$key = decodeXmlName($key);
+
+		if (substr_compare($key, '--array', -7, 7) === 0) {
+			$key   = substr($key, 0, -7);
+			$value = (array)$value;
+		} else {
+			if (! $value) {
+				$value = '';
+			}
+		}
+
+		if (substr_compare($key, '--boolean', -9, 9) === 0) {
+			$key   = substr($key, 0, -9);
+			$value = (boolean)$value;
+		}
+
+		if (substr_compare($key, '--null', -6, 6) === 0) {
+			$key   = substr($key, 0, -6);
+			$value = null;
+		}
+
+		if (substr_compare($key, '--int', -5, 5) === 0) {
+			$key   = substr($key, 0, -5);
+			$value = (int)$value;
+		}
+
+		if (substr_compare($key, '--object', -8, 8) === 0) {
+			$key   = substr($key, 0, -8);
+			$value = (object)$value;
+		}
+
+		if (substr_compare($key, 'n--', 0, 3) === 0) {
+			$newkey = substr($key, 3);
+
+			if (is_numeric($newkey)) {
+				$key = intval($newkey);
+			}
+		}
+
+		if (substr_compare($key, '--xmlattr', -9, 9) === 0) {
+			$key = '@@' . substr($key, 0, -9);
+		}
+
+		if (substr_compare($key, '--attr', -6, 6) === 0) {
+			$key = '@' . substr($key, 0, -6);
+		}
+
+		$helper[$key] = (is_iterable($value)) ? reconstructJson($value, $removeAttrs) : $value;
+	}
+
+	return $helper;
+}
+
+function fileUploadErrMessage($errorCode) {
+	switch ($errorCode) {
+		case UPLOAD_ERR_OK:
+			return __('No file sent');
+
+			break;
+
+		case UPLOAD_ERR_NO_FILE:
+			return __('No file sent');
+
+			break;
+
+		case UPLOAD_ERR_PARTIAL:
+			return __('The uploaded file was only partially uploaded');
+
+			break;
+
+		case UPLOAD_ERR_NO_TMP_DIR:
+			return __('Missing a temporary folder');
+
+			break;
+
+		case UPLOAD_ERR_CANT_WRITE:
+			return __('Failed to write file to disk');
+
+			break;
+
+		case UPLOAD_ERR_EXTENSION:
+			return __('A PHP extension stopped the file upload');
+
+			break;
+
+		case UPLOAD_ERR_INI_SIZE:
+		case UPLOAD_ERR_FORM_SIZE:
+			return __('Exceeded filesize limit');
+
+			break;
+
+		default:
+			return __('Unknown errors');
+	}
 }

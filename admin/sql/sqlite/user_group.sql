@@ -12,7 +12,7 @@
 	BEGIN
 		-- user_group
 		SELECT user_group.*,user_group_content.name, user_group_content.content, user_group_content.language_id
-			FROM user_group AS user_group 
+			FROM user_group 
 			INNER JOIN user_group_content ON user_group_content.user_group_id = user_group.user_group_id
 		WHERE 1 = 1
 		
@@ -63,7 +63,7 @@
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:user_group_data  = @FILTER(:user_group, user_group);
+		:user_group_data  = @FILTER(:user_group, user_group)
 		
 		INSERT INTO user_group 
 			
@@ -71,7 +71,7 @@
 			
 	  	VALUES ( :user_group_data );
 	  	
-	  	:user_group_content  = @FILTER(:user_group, user_group_content);
+	  	:user_group_content  = @FILTER(:user_group, user_group_content)
 	  	
 		INSERT INTO user_group_content 
 			
@@ -91,7 +91,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		:user_group_data = @FILTER(:user_group, user_group);
+		:user_group_data = @FILTER(:user_group, user_group)
 
 		UPDATE user_group
 			
@@ -100,7 +100,7 @@
 		WHERE user_group_id = :user_group_id;
 
 		-- allow only table fields and set defaults for missing values
-		:user_group_content  = @FILTER(:user_group, user_group_content);
+		:user_group_content  = @FILTER(:user_group, user_group_content)
 
 		UPDATE user_group_content
 			

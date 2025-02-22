@@ -15,14 +15,14 @@
 	BEGIN
 		-- site
 		SELECT *, site_id as array_key
-			FROM site as sites
+			FROM site
 
-		WHERE 1
+		WHERE 1 = 1
 		
 		-- site_id
 		@IF isset(:site_id) && !empty(:site_id)
 		THEN
-			AND sites.site_id IN (:site_id)
+			AND site.site_id IN (:site_id)
 		END @IF
 
 		-- limit
@@ -34,7 +34,7 @@
 		-- SELECT FOUND_ROWS() as count;
 		SELECT count(*) FROM (
 			
-			@SQL_COUNT(sites.site_id, site) -- this takes previous query removes limit and replaces select columns with parameter product_id
+			@SQL_COUNT(site.site_id, site) -- this takes previous query removes limit and replaces select columns with parameter product_id
 			
 		) as count;
 	END	
@@ -50,6 +50,8 @@
 		OUT fetch_all, 		
 		OUT fetch_all, 		
 		OUT fetch_all, 		
+		OUT fetch_all, 		
+		OUT fetch_all 		
 	)
 	BEGIN
 		-- country
@@ -108,6 +110,50 @@
 				ON length_type_id.length_type_id = length_desc.length_type_id; -- (underscore) _ means that data will be kept in main array				
 	END	
 	
+	-- site data
+
+	PROCEDURE getSiteData(
+		IN site ARRAY,
+		OUT fetch_one, 		
+		OUT fetch_one, 		
+		OUT fetch_one, 		
+		OUT fetch_one, 		
+		OUT fetch_one, 		
+		OUT fetch_one
+	)
+	BEGIN
+		-- country
+		SELECT 
+			name
+		FROM country as country_id WHERE country_id = :site.country_id;
+		
+		-- Region
+		SELECT 
+			name			
+		FROM region as region_id WHERE region_id = :site.region_id;		
+		
+		-- language
+		SELECT 
+			name			
+		FROM language as language_id WHERE language_id = :site.language_id;			
+		
+		-- currency
+		SELECT 
+			name		
+		FROM currency as currency_id WHERE currency_id = :site.currency_id;	
+				
+		-- weight_type
+		SELECT 
+			unit			
+		FROM weight_type_content as weight_type WHERE weight_type_id = :site.weight_type_id;		
+		
+		-- length_type
+		SELECT 
+			unit			
+		FROM length_type_content AS length_type WHERE length_type_id = :site.length_type_id;
+				
+	END	
+
 	-- get site
 
 	PROCEDURE get(
@@ -124,19 +170,19 @@
 
 	PROCEDURE add(
 		IN site ARRAY,
-		OUT insert_id
+		OUT fetch_one
 	)
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:site_data  = @FILTER(:site, site);
+		:site_data  = @FILTER(:site, site)
 		
 		
 		INSERT INTO site 
 			
 			( @KEYS(:site_data) )
 			
-	  	VALUES ( :site_data );
+	  	VALUES ( :site_data ) RETURNING site_id;
 
 	END
 	
@@ -149,7 +195,7 @@
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:site_data  = @FILTER(:site, site);
+		:site_data  = @FILTER(:site, site)
 	
 		UPDATE site 
 			

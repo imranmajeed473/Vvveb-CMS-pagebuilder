@@ -50,25 +50,43 @@ INSERT INTO `menu_item` (`menu_item_id`, `menu_id`, `type`, `url`, `parent_id`, 
 -- (47,1,'link','//github.com/givanz/Vvveb/discussions',44,null,0,1),
 -- (48,1,'link','//dev.*.*',44,null,3,1),
 
-(49,1,'link','/page/contact',0,null,6,1),
-(59,1,'link','/page/about',0,null,1,1),
+(49,1,'page','/page/contact',0,7,6,1),
+(59,1,'page','/page/about',0,11,1,1),
 -- (60,1,'link','/page/contact',59,null,0,1),
 -- (61,1,'link','/page/contact',59,null,3,1),
 -- (62,1,'link','/page/contact',59,null,2,1),
 
-(63,1,'link','/page/contact',0,null,4,1),
-(64,1,'link','/page/pricing',63,null,0,1),
-(65,1,'link','/page/services',63,null,0,1),
-(66,1,'link','/page/portfolio',63,null,0,1),
-(67,1,'text','/page/about',0,NULL,3,	0),
-(68,1,'text','/page/about',67,NULL,0,0),
+(63,1,'page','/page/services',0,12,4,1),
+(64,1,'page','/page/pricing',63,13,0,1),
+(65,1,'page','/page/services',63,12,0,1),
+(80,5,'page','/page/marketplace',63,15,0,1),
+(66,1,'page','/page/portfolio',63,14,0,1),
+(67,1,'text','#',0,14,3,0),
+(68,1,'text','#',67,11,0,0),
+
 -- footer
 (50,5,'link','',0,null,0,1),
 (51,5,'link','/',50,null,0,1),
 (52,5,'link','/shop',50,null,0,1),
-(53,5,'link','//docs.*.*',0,null,0,1),
-(54,5,'link','//dev.*.*',53,null,0,1),
-(55,5,'link','//docs.*.*',53,null,0,1),
-(56,5,'link','//github.com/givanz/VvvebJs',57,null,0,1),
-(57,5,'link','/contact.html',0,null,0,1),
-(58,5,'link','/blog',57,null,0,1);
+(53,5,'link','/',0,null,0,1),
+(54,5,'page','/page/shipping-delivery',8,8,0,1),
+(55,5,'page','/page/terms-conditions',9,9,0,1),
+(56,5,'page','/page/contact',0,7,0,1),
+(57,5,'page','/page/contact',56,7,0,1),
+(58,5,'page','/page/portfolio',56,14,0,1),
+(73,5,'link','/user/return-form',56,null,0,1),
+
+
+
+(69,5,'link','/user',0,null,0,1),
+(70,5,'link','/user/order-tracking',69,null,0,1),
+(71,5,'link','/user/wishlist',69,null,0,1),
+(72,5,'link','/user/orders',69,null,0,1),
+(79,5,'link','/cart/compare',69,null,0,1),
+
+
+(74,5,'link','/blog',50,null,0,1),
+(75,5,'page','/page/services',50,12,0,1),
+(76,5,'page','/page/about',56,11,0,1),
+(77,5,'link','/brand',53,null,0,1),
+(78,5,'link','/vendor',53,null,0,1);

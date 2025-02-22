@@ -31,15 +31,19 @@ use Vvveb\System\Images;
 class Option extends Crud {
 	protected $type = 'option';
 
-	protected $controller = 'option_value';
+	protected $controller = 'option';
 
 	protected $module = 'product';
 
 	function save() {
-		$delete		     = $this->request->post['delete']['option_value_id'] ?? [];
+		$this->redirect = false;
+		parent::save();
+		
+		$delete       = $this->request->post['delete']['option_value_id'] ?? [];
 		$option_value = $this->request->post['option_value'] ?? [];
 		$option	      = $this->request->post['option'] ?? [];
-		$option_id    = $this->request->get['option_id'] ?? false;
+		$edit         = $this->request->get['option_id'] ?? false;
+		$option_id    = $this->option_id;
 		$new          = [];
 
 		foreach ($option_value as $index => &$attr) {
@@ -76,15 +80,15 @@ class Option extends Crud {
 			$result      = $optionSql->edit(['option_id' => $option_id, 'option' => $option]);
 
 			if ($result && isset($result['option_content'])) {
-				//$successMessage        = __('Saved!');
-				//$this->view->success[] = $successMessage;
-				//$this->view->errors    = [];
+				if (!$edit) {
+					$this->redirect(['module' => "{$this->module}/{$this->controller}", 'option_id' => $option_id]);
+				}
 			} else {
 				$this->view->errors[] = __('Error saving!');
 			}
 		}
 
-		parent::save();
+		return $this->index();
 	}
 
 	function index() {
@@ -95,7 +99,7 @@ class Option extends Crud {
 
 		if ($option_id) {
 			$option_valueGroup  = new Option_ValueSQL();
-			$option_values	     = $option_valueGroup->getAll(['option_id' => $option_id] + $this->global)['option_value'] ?? [];
+			$option_values	     = $option_valueGroup->getAll(['option_id' => $option_id, 'limit' => 1000] + $this->global)['option_value'] ?? [];
 
 			foreach ($option_values as &$value) {
 				$value['image_url'] = Images::image($value['image'], 'product', 'thumb');

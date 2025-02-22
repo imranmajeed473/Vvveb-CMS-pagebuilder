@@ -1,4 +1,4 @@
--- Addresss
+-- Address
 
 	-- get all user addresses 
 
@@ -19,7 +19,7 @@
 
 		SELECT *
 		
-			FROM user_address AS user_address
+			FROM user_address
 		WHERE 1 = 1
             
 		-- user
@@ -43,6 +43,7 @@
 
 	CREATE PROCEDURE get(
 		IN user_address_id INT,
+		IN user_id INT,
 		OUT fetch_row,
 	)
 	BEGIN
@@ -51,11 +52,17 @@
 			FROM user_address AS _
 		WHERE 1 = 1
 
-            @IF isset(:user_address_id)
-			THEN
-                AND _.user_address_id = :user_address_id
+		@IF isset(:user_address_id)
+		THEN
+			AND _.user_address_id = :user_address_id
         	END @IF			
 
+        	-- user
+        	@IF isset(:user_id)
+        	THEN 
+			AND _.user_id  = :user_id
+        	END @IF	   
+			
         LIMIT 1; 
 		
 		
@@ -74,7 +81,7 @@
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:user_address, user_address);
+		@FILTER(:user_address, user_address)
 		
 		INSERT INTO user_address 
 			
@@ -94,7 +101,7 @@
 	)
 	BEGIN
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:user_address, user_address);
+		@FILTER(:user_address, user_address)
 
 		UPDATE user_address 
 			

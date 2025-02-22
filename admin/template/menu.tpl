@@ -12,11 +12,13 @@
 if (isset($this->menu) && $this->menu)
 foreach($this->menu as $key => $menu_item) {
 	
-	if (isset($menu_item['permission']) && !$menu_item['permission']) continue;?>
+	if (isset($menu_item['permission']) && !$menu_item['permission']) continue;
+	if (isset($menu_item['heading'])) $menu_item['url'] = 'javascript:void(0)';
+	?>
 
-	@menu_item [data-v-menu-item-url]|href = $menu_item['url']
+	@menu_item [data-v-menu-item-url]|href  = $menu_item['url']
 	@menu_item [data-v-menu-item-url]|title = $menu_item['name']
-	@menu_item [data-v-menu-item-name] = $menu_item['name']
+	@menu_item [data-v-menu-item-name]      = $menu_item['name']
 	@menu_item [data-v-menu-item-subtitle]|if_exists = $menu_item['subtitle']
 	@menu_item [data-v-menu-item-subtitle] = $menu_item['subtitle']
 	
@@ -34,14 +36,14 @@ foreach($this->menu as $key => $menu_item) {
 	@menu_item [data-v-menu-item-badge] = $menu_item['badge']
 
 	@menu_item|addClass = <?php 
-		if (isset($menu_item['heading'])) echo ' heading';
-		if (isset($menu_item['class'])) echo $menu_item['class'];
+		if (isset($menu_item['heading'])) echo 'heading';
+		if (isset($menu_item['class'])) echo htmlspecialchars($menu_item['class']);
 	?>
 	@menu_item [data-v-menu-item-url]|addClass = <?php if (isset($menu_item['items'])) echo 'items';?>
 	@menu_item .mobile|addNewAttribute = <?php if (isset($menu_item['items'])) echo 'data-bs-toggle="dropdown"';?>
-	@menu_item [data-v-menu-item-url]|data-target = <?php echo '#menu-' . $key;?>
+	@menu_item [data-v-menu-item-url]|data-target = <?php echo '#menu-' . htmlspecialchars($key);?>
 
-	//@submenumenu_item|id = <?php echo '#menu-' . $key;?>
+	//@submenumenu_item|id = <?php echo '#menu-' . htmlspecialchars($key);?>
 	//@submenumenu_item|addClass = <?php echo 'dropdown-menu';?>
 	@submenumenu_item|addClass = <?php 
 		if (isset($menu_item['show_on_modules']) && in_array($_GET['module'], $menu_item['show_on_modules'])) echo 'show';
@@ -56,12 +58,14 @@ foreach($this->menu as $key => $menu_item) {
 	
 	@submenumenu_item [data-v-submenu-item]|addClass = <?php 
 		if (isset($submenu_item['heading'])) echo ' heading';
-		if (isset($submenu_item['class'])) echo $submenu_item['class'];
+		if (isset($submenu_item['class'])) echo htmlspecialchars($submenu_item['class']);
 	?>	
 	
 	@submenumenu_item [data-v-submenu-item]|before = <?php
 		foreach($items as $key => $submenu_item) {
-			if (isset($submenu_item['permission']) && !$submenu_item['permission']) continue;?>
+			if (isset($submenu_item['permission']) && !$submenu_item['permission']) continue;
+			if (isset($submenu_item['heading'])) $submenu_item['url'] = 'javascript:void(0)';
+			?>
 		
 			@submenumenu_item [data-v-submenu-item-url]|href = $submenu_item['url']
 			@submenumenu_item [data-v-submenu-item-name] = $submenu_item['name']

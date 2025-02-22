@@ -34,7 +34,7 @@ class Autocomplete extends Base {
 		$options = [
 			'start'  => 0,
 			'limit'  => 10,
-			'search' => '%' . $text . '%',
+			'like'   => $text,
 		] + $this->global;
 
 		unset($options['admin_id']);
@@ -43,7 +43,7 @@ class Autocomplete extends Base {
 
 		$search = [];
 
-		foreach ($results['products'] as $product) {
+		foreach ($results['product'] as $product) {
 			$search[$product['product_id']] = $product['name'];
 		}
 
@@ -85,11 +85,11 @@ class Autocomplete extends Base {
 
 		$manufacturers = new \Vvveb\Sql\ManufacturerSQL();
 
-		$results = $manufacturers->getManufacturers($options);
+		$results = $manufacturers->getAll($options);
 
 		$search = [];
 
-		foreach ($results['manufacturers'] as $manufacturer) {
+		foreach ($results['manufacturer'] as $manufacturer) {
 			$search[$manufacturer['manufacturer_id']] = $manufacturer['name'];
 		}
 
@@ -105,8 +105,8 @@ class Autocomplete extends Base {
 			'start'  => 0,
 			'limit'  => 10,
 			'type'   => $type,
-			'search' => $text,
-			//s'like' => '%' . $text . '%',
+			'like'   => $text,
+			//'like' => '%' . $text . '%',
 		] + $this->global;
 
 		unset($options['admin_id']);
@@ -114,9 +114,9 @@ class Autocomplete extends Base {
 		$results = $posts->getAll($options);
 
 		$search = [];
-		
-		if (isset($results['posts'])) {
-			foreach ($results['posts'] as $post) {
+
+		if (isset($results['post'])) {
+			foreach ($results['post'] as $post) {
 				$search[$post['post_id']] = substr($post['name'],0, 50);
 			}
 		}

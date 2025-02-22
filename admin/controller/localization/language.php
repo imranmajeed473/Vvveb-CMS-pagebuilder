@@ -35,48 +35,54 @@ class Language extends Crud {
 	protected $module = 'localization';
 
 	protected $installUrl = 'https://raw.githubusercontent.com/Vvveb/{code}/master/LC_MESSAGES/';
-	
-	protected $files = ['vvveb.po', 'landing-theme.po'];
+
+	protected $files = ['vvveb.po'];
 
 	protected $listUrl = 'https://www.vvveb.com/page/contribute#language';
 
 	function save() {
-		CacheManager::delete(APP . 'cache.languages');
+		CacheManager::clearObjectCache(APP, 'languages');
 
 		return parent::save();
 	}
 
 	function install() {
-		$code         = filter('/[-\w]+/', $this->request->post['code']);
-		$url          = str_replace('{code}', $code, $this->installUrl);
-		
+		$code = filter('/[-\w]+/', $this->request->post['code']);
+		$url = str_replace('{code}', $code, $this->installUrl);
+		$available = false;
+
 		require DIR_SYSTEM . 'functions' . DS . 'php-mo.php';
-		
+
 		foreach ($this->files as $file) {
 			$translations = download($url . $file);
 
 			if ($translations) {
+				$available = true;
 				$folder = DIR_ROOT . 'locale' . DS . $code . DS . 'LC_MESSAGES';
 				$poFile = $folder . DS . $file;
 				@mkdir($folder, 0755 & ~umask(), true);
 
 				if (file_put_contents($poFile, $translations)) {
-
 					if (phpmo_convert($poFile)) {
 						$this->view->success['language'] = __('Language pack installed!');
 					} else {
 						$this->view->errors['language'] = __('Language compilation failed!');
+
 						break;
 					}
 				} else {
 					$this->view->errors[] = __('Error writing language files!');
+
 					break;
 				}
 			} else {
-				$this->view->errors[] = __('Language pack not available!');
-				$this->view->info[]   = sprintf(__('Check available translations at %s'), '<a href="' . $this->listUrl . '" target="_blank">' . $this->listUrl . '</a>');
 				break;
 			}
+		}
+		
+		if (!$available) {
+			$this->view->errors[] = __('Language pack not available!');
+			$this->view->info[]   = sprintf(__('Check available translations at %s'), '<a href="' . $this->listUrl . '" target="_blank">' . $this->listUrl . '</a>');
 		}
 
 		return $this->index();
@@ -93,7 +99,7 @@ class Language extends Crud {
 
 		$this->view->language_list  = $languageList;
 
-		$this->view->status  = [1 => 'Active', 0 => 'Inactive'];
-		$this->view->default = [0 => 'No', 1 => 'Yes'];
+		$this->view->status  = [1 => __('Active'), 0 => __('Inactive')];
+		$this->view->default = $this->view->rtl =  [0 => __('No'), 1 => __('Yes')];
 	}
 }

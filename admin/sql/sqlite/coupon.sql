@@ -12,7 +12,7 @@
 	BEGIN
 		-- coupon
 		SELECT *
-			FROM coupon AS coupon WHERE 1 = 1
+			FROM coupon WHERE 1 = 1
 			
 		
 		@SQL_LIMIT(:start, :limit);
@@ -55,7 +55,7 @@
 			AND coupon_id = :coupon_id
 		END @IF		
 
-		@IF !empty(:status) 
+		@IF isset(:status) AND :status != ""
 		THEN			
 			AND status = :status
 		END @IF
@@ -72,7 +72,7 @@
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:coupon_data  = @FILTER(:coupon, coupon);
+		:coupon_data  = @FILTER(:coupon, coupon)
 		
 		
 		INSERT INTO coupon 
@@ -93,7 +93,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:coupon, coupon);
+		@FILTER(:coupon, coupon)
 
 		UPDATE coupon
 			

@@ -23,7 +23,7 @@
 namespace Vvveb\Controller;
 
 use function Vvveb\__;
-use function Vvveb\array_insert_array_after;
+use function Vvveb\arrayInsertArrayAfter;
 use function Vvveb\availableCurrencies;
 use function Vvveb\availableLanguages;
 use function Vvveb\clearLanguageCache;
@@ -40,10 +40,13 @@ use Vvveb\System\Images;
 use Vvveb\System\PageCache;
 use Vvveb\System\Session;
 use Vvveb\System\Sites;
+use Vvveb\System\Traits\Permission;
 use Vvveb\System\User\Admin;
 
 #[\AllowDynamicProperties]
 class Base {
+	use Permission;
+
 	public $view;
 
 	public $request;
@@ -56,15 +59,18 @@ class Base {
 		//if no id set default
 		if ($site_id) {
 			$site  = Sites::getSiteById($site_id);
-		} else {
+		}
+
+		if (! $site_id || ! $site) {
 			$site = Sites::getDefault();
 		}
 
 		$site_id = $site['id'];
 		$this->session->set('site', $site);
 		$this->session->set('site_id', $site_id);
-		$this->session->set('site_url', $site['host']);
+		$this->session->set('site_url', $site['url']);
 		$this->session->set('site', $site['id']);
+		$this->session->set('host', $site['host']);
 		$this->session->set('state', $site['state'] ?? 'live');
 
 		return $site_id;
@@ -95,8 +101,8 @@ class Base {
 			],
 		];
 
-		$custom_posts_types        = \Vvveb\get_setting('post', 'types', []);
-		$custom_posts_types       += $default_custom_posts;
+		$custom_posts_types        = \Vvveb\getSetting('post', 'types', []);
+		$custom_posts_types += $default_custom_posts;
 		list($custom_posts_types) = Event::trigger(__CLASS__, __FUNCTION__, $custom_posts_types);
 
 		$custom_post_menu = \Vvveb\config('custom-post-menu', []);
@@ -144,7 +150,7 @@ class Base {
 					'icon'   => $icon,
 				]];
 
-				$posts_menu[$type]['items'] = array_insert_array_after('taxonomy-heading', $posts_menu[$type]['items'], $tax);
+				$posts_menu[$type]['items'] = arrayInsertArrayAfter('taxonomy-heading', $posts_menu[$type]['items'], $tax);
 			}
 		}
 
@@ -162,8 +168,8 @@ class Base {
 			],
 		];
 
-		$custom_products_types       = \Vvveb\get_setting('product', 'types', []);
-		$custom_products_types      += $default_custom_products;
+		$custom_products_types       = \Vvveb\getSetting('product', 'types', []);
+		$custom_products_types += $default_custom_products;
 		list($custom_products_types) = Event::trigger(__CLASS__, __FUNCTION__, $custom_products_types);
 
 		$custom_product_menu = \Vvveb\config('custom-product-menu', []);
@@ -208,137 +214,106 @@ class Base {
 					'icon'   => $icon,
 				]];
 
-				$products_menu[$type]['items'] = array_insert_array_after('taxonomy-heading', $products_menu[$type]['items'], $tax);
+				$products_menu[$type]['items'] = arrayInsertArrayAfter('taxonomy-heading', $products_menu[$type]['items'], $tax);
 			}
 		}
 
 		return $products_menu;
 	}
 
-	/*
-	 * Permission check for each module/action
-	 */
-	protected function permissions() {
-		$module     = strtolower(FrontController::getModuleName());
-		$action     = strtolower(FrontController::getActionName());
-		$action     = $action ? '/' . $action : '';
-		$permission = $module . $action;
-
-		//if current module/action does not have permission then show permission denied page
-		if (! Admin::hasPermission($permission)) {
-			$message              = __('Your role does not have permission to access this action!');
-			$this->view->errors[] = $message;
-
-			die($this->notFound(true, $message, 403));
-		}
-
-		//get current controller methods to check for permission
-		$methods = get_class_methods($this);
-		//$methods = array_map(fn ($value) => "$module/$value", $methods);
-		$methods = array_map(function ($value) use ($module) {return "$module/$value"; }, $methods);
-
-		//check if controller requires additional permission check
-		if (isset($this->additionalPermissionCheck)) {
-			$methods = array_merge($methods, $this->additionalPermissionCheck);
-		}
-
-		$permissions = Admin::hasPermission($methods);
-
-		//set a permission array only with action keys for easier permission check in html
-		$this->modulePermissions = $permissions;
-
-		foreach ($permissions as $permission => &$value) {
-			$key                     = str_replace("$module/", '', $permission);
-			$actionPermissions[$key] = $value;
-		}
-		$this->actionPermissions = $actionPermissions;
-	}
-
-	protected function getPermissionsFromUrl(&$array, &$permissions) {
-		foreach ($array as $k => $v) {
-			if (is_array($v)) {
-				if (isset($v['url'])) {
-					if (isset($v['module'])) {
-						$permissions[$v['url']] = ($v['module'] ?? '') . (isset($v['action']) ? '/' . $v['action'] : '');
-					} else {
-						$permissions[$v['url']] = \Vvveb\pregMatch('/module=([^&$]+)/', $v['url'], 1);
-					}
-				}
-				$this->getPermissionsFromUrl($v, $permissions);
-			}
-		}
-	}
-
-	protected function setPermissionsFromUrl(&$array, &$permissions) {
-		foreach ($array as $k => &$v) {
-			if (is_array($v)) {
-				if (isset($v['url'])) {
-					$url = $v['url'];
-
-					if (isset($permissions[$url])) {
-						$v['permission'] = $permissions[$url];
-					}
-				}
-				$this->setPermissionsFromUrl($v, $permissions);
-			}
-		}
-	}
-
-	protected function language($defaultLanguage, $defaultLanguageId) {
+	protected function language($defaultLanguage = false, $defaultLanguageId = false, $defaultLocale = false) {
 		$languages = availableLanguages();
 
-		if (($language = ($this->request->post['language'] ?? false)) && ! is_array($language)) {
-			$language  = filter('/[A-Za-z_-]+/', $language, 50);
-			$this->session->set('language', $language);
-			$this->session->set('language_id', $languages[$language]['language_id'] ?? $defaultLanguageId);
-			clearLanguageCache($language);
-		}
+		$default_language    = $this->session->get('default_language');
+		$default_language_id = $this->session->get('default_language_id');
+		$default_locale      = $this->session->get('default_locale');
+		$site_language       = false;
 
-		$default_language    = $this->session->get('default_language') ?? $default_language = $defaultLanguage;
-		$default_language_id = $this->session->get('default_language_id') ?? $default_language_id = $defaultLanguageId;
-		$language            = $this->session->get('language') ?? $language = $default_language;
-		$language_id         = $this->session->get('language_id') ?? $language_id = $defaultLanguageId;
+		if (($lang = ($this->request->post['language'] ?? false)) && ! is_array($lang)) {
+			$language  = filter('/[A-Za-z_-]+/', $lang, 10);
+
+			if (isset($languages[$language])) {
+				$this->session->set('language', $language);
+				$this->session->set('language_id', $languages[$language]['language_id']);
+				$this->session->set('locale', $languages[$language]['locale']);
+				$this->session->set('rtl', $languages[$language]['rtl'] ?? false);
+				$default_language = false; //recheck default language
+				clearLanguageCache($language);
+			}
+		}
 
 		if (! $default_language) {
 			foreach ($languages as $code => $lang) {
+				//set site language
+				if ($defaultLanguageId && ($defaultLanguageId == $lang['language_id'])) {
+					$site_language    = $code;
+					$site_language_id = $lang['language_id'];
+					$site_locale      = $lang['locale'];
+				}
+
+				//set global default language
 				if ($lang['default']) {
 					$default_language    = $code;
 					$default_language_id = $lang['language_id'];
+					$default_locale      = $lang['locale'];
 
 					break;
 				}
 			}
-			//no default language? set english as default
+
+			if ($site_language) {
+				$default_language    = $site_language;
+				$default_language_id = $site_language_id;
+				$default_locale      = $site_locale;
+			}
+
+			//no valid default site or global language? set english as default
 			if (! $default_language) {
 				$default_language    = 'en_US';
 				$default_language_id = 1;
+				$default_locale      = 'en-us';
 			}
 
 			$this->session->set('default_language', $default_language);
 			$this->session->set('default_language_id', $default_language_id);
+			$this->session->set('default_locale', $default_locale);
+		}
+
+		$language    = $this->session->get('language') ?? $default_language;
+		$language_id = $this->session->get('language_id') ?? $default_language_id;
+		$locale      = $this->session->get('locale') ?? $default_locale;
+		$rtl         = $this->session->get('rtl') ?? false;
+
+		//if no default language configured then set first language as current language
+		if (! isset($languages[$language])) {
+			$default_language    = key($languages);
+			$lang                = $languages[$default_language] ?? [];
+
+			if ($lang) {
+				$default_language_id = $lang['language_id'] ?? $defaultLanguageId;
+				$default_locale      = $lang['locale'] ?? $defaultLocale;
+				$default_rtl         = $lang['rtl'] ?? false;
+			}
 		}
 
 		//if no language configured then set default language as current language
 		if (! $language) {
 			$language    = $default_language;
 			$language_id = $default_language_id;
+			$locale      = $default_locale;
+			$rtl         = $default_rtl;
 			$this->session->set('language', $language);
 			$this->session->set('language_id', $language_id);
+			$this->session->set('locale', $locale);
+			$this->session->set('rtl', $rtl);
 		}
-
-		//if no default language configured then set first language as current language
-		if (! isset($languages[$language])) {
-			$language = key($languages);
-			$this->session->set('language', $language);
-			$this->session->set('language_id', $languages[$language]['language_id'] ?? $defaultLanguageId);
-		}
-
-		$language    = $this->session->get('language') ?? 'en_US';
-		$language_id = $this->session->get('language_id') ?? $defaultLanguageId;
 
 		$this->global['language']            = $language;
+		$this->global['locale']              = $locale;
 		$this->global['language_id']         = $language_id;
+		$this->global['rtl']                 = $rtl;
 		$this->global['default_language']    = $default_language;
+		$this->global['default_locale']      = $default_locale;
 		$this->global['default_language_id'] = $default_language_id;
 
 		setLanguage($language);
@@ -349,7 +324,7 @@ class Base {
 		}
 	}
 
-	protected function currency($defaultCurrency, $defaultCurrencyId) {
+	protected function currency($defaultCurrency = false, $defaultCurrencyId = false) {
 		if (($currency = ($this->request->post['currency'] ?? false)) && ! is_array($currency)) {
 			$currency   = filter('/[A-Za-z_-]+/', $currency, 50);
 			$currencies = availableCurrencies();
@@ -357,19 +332,38 @@ class Base {
 			if (isset($currencies[$currency])) {
 				$this->session->set('currency_id', $currencies[$currency]['currency_id']);
 				$this->session->set('currency', $currency);
+
+				\Vvveb\System\Cart\Cart::getInstance($this->global)->updateCart();
 			}
 		}
 
-		$currency    = $this->session->get('currency') ?? $currency = $defaultCurrency;
-		$currency_id = $this->session->get('currency_id') ?? $currency_id = $defaultCurrencyId;
+		$currency    = $this->session->get('currency');
+		$currency_id = $this->session->get('currency_id');
 
-		if (! $currency) {
-			/*
-			//if no site currency configured set first available currency
+		if (! $currency || ! $currency_id) {
 			$currencies = availableCurrencies();
-			$currency = $this->session->get('currency')
-			$currency_id = $this->session->get('currency_id');
-			*/
+
+			if ($currencies) {
+				foreach ($currencies as $code => $c) {
+					if ($defaultCurrency && ($defaultCurrency == $c['code']) ||
+					   ($defaultCurrencyId && ($defaultCurrencyId == $c['currency_id']))) {
+						$currency    = $c['code'];
+						$currency_id = $c['currency_id'];
+
+						break;
+					}
+				}
+
+				//if no site currency configured set first available currency
+				if (! $currency) {
+					$c           = reset($currencies);
+					$currency    = $c['code'];
+					$currency_id = $c['currency_id'];
+				}
+			}
+
+			$this->session->set('currency', $currency);
+			$this->session->set('currency_id', $currency_id);
 		}
 
 		$this->global['currency']            = $currency;
@@ -415,18 +409,21 @@ class Base {
 			$site_id = $this->setSite();
 		}
 
-		$this->language('en_US', 1);
-		$this->currency('USD', 1);
+		$this->language();
+		$this->currency();
+		$adminPath = \Vvveb\adminPath();
 
 		//change site status (live, under maintenance etc)
 		if ($state = ($this->request->post['state'] ?? false)) {
 			if (Admin::hasPermission('settings/site/save')) {
 				if (Sites::setSiteDataById($site_id, 'state', $state)) {
 					$this->session->set('state', $state);
+					PageCache::getInstance()->purge();
 				}
 			} else {
-				$message              = __('Your role does not have permission to access this action!');
-				$this->view->errors[] = $message;
+				$message               = __('Your role does not have permission to access this action!');
+				$this->view->errors[]  = $message;
+				$this->view->adminPath = $adminPath;
 			}
 		}
 
@@ -434,6 +431,8 @@ class Base {
 		$limit       = $this->request->get['limit'] ?? 10;
 
 		$this->global['site_id']  = $site_id;
+		$this->global['host']     = $this->session->get('host');
+		$this->global['site_url'] = $this->session->get('site_url');
 		$this->global['admin_id'] = $admin['admin_id'];
 		$this->global['state']    = $state;
 		$this->global['page']     = $page;
@@ -444,43 +443,47 @@ class Base {
 		$className = get_class($this);
 
 		if ($className != 'Vvveb\Controller\Error403') {
-			$this->permissions();
+			$this->permission();
+			$this->setPermissions();
 		}
 
 		//load plugins for active site if safe mode is not selected
-		if (! isset($admin['safemode'])) {
+		if (! isset($admin['safemode']) || ! $admin['safemode']) {
 			Plugins :: loadPlugins($site_id);
 		}
 
 		if ($errors = $this->session->get('errors')) {
-			$view->errors['session'] = $errors;
+			if (is_array($errors)) {
+				$view->errors = ($view->errors ?? []) + $errors;
+			} else {
+				$view->errors['session'] = $errors;
+			}
 			$this->session->delete('errors');
 		}
 
 		if ($success = $this->session->get('success')) {
-			$view->success['session'] = $success;
+			if (is_array($success)) {
+				$view->success = ($view->success ?? []) + $success;
+			} else {
+				$view->success['session'] = $success;
+			}
 			$this->session->delete('success');
 		}
-
-		$menu             = \Vvveb\config('admin-menu', []);
 
 		//don't initialize menu items for CLI
 		if (defined('CLI')) {
 			return;
 		}
-
-		//send to view for button visibillity check
-		$this->view->actionPermissions = $this->actionPermissions ?? [];
-		$this->view->modulePermissions = $this->modulePermissions ?? [];
+		$menu             = \Vvveb\config('admin-menu', []);
 
 		//custom posts -- add to menu
 		$this->taxonomies = $this->getTaxonomies();
 		$posts_menu       = $this->customPost();
-		$menu             = array_insert_array_after('edit', $menu, $posts_menu);
+		$menu             = arrayInsertArrayAfter('edit', $menu, $posts_menu);
 
 		//products - add to menu
 		$products_menu = $this->customProduct();
-		$menu          = array_insert_array_after('sales', $menu, $products_menu);
+		$menu          = arrayInsertArrayAfter('sales', $menu, $products_menu);
 
 		list($menu)       = Event::trigger(__CLASS__, __FUNCTION__ . '-menu', $menu);
 
@@ -491,9 +494,13 @@ class Base {
 		$urls        = array_map(function ($value) use ($permissions) { return $value ? ($permissions[$value] ?? false) : false; }, $urls);
 		$this->setPermissionsFromUrl($menu, $urls);
 
-		$view->menu       = $menu;
+		$view->menu         = $menu;
+		$view->global       = $this->global;
 
-		$adminPath        = \Vvveb\adminPath();
+		//send to view for button visibillity check
+		$this->view->actionPermissions = $this->actionPermissions ?? [];
+		$this->view->modulePermissions = $this->modulePermissions ?? [];
+
 		$view->adminPath  = $adminPath;
 		$view->mediaPath  = PUBLIC_PATH . 'media';
 		$view->publicPath = PUBLIC_PATH . 'media';
@@ -513,7 +520,7 @@ class Base {
 			FrontController::closeConnections();
 			PageCache::getInstance()->cleanUp();
 
-			die();
+			die(0);
 		}
 	}
 
@@ -524,11 +531,15 @@ class Base {
 	protected function requireLogin() {
 		//return \Vvveb\System\Core\FrontController::redirect('user/login');
 		//$view = view :: getInstance();
-		$admin_path         = \Vvveb\adminPath();
-		$this->view->action = "{$admin_path}index.php?module=user/login";
+		$admin_path            = \Vvveb\adminPath();
+		$this->view->redir     = $_SERVER['REQUEST_URI'] ?? '';
+		$this->view->adminPath = $admin_path;
+		$this->view->action    = "{$admin_path}index.php?module=user/login";
 		$this->view->template('user/login.html');
 
-		die($this->view->render());
+		$this->view->render();
+
+		die(0);
 	}
 
 	/**
@@ -539,7 +550,7 @@ class Base {
 	 * @param mixed $service
 	 * @param mixed $message
 	 */
-	protected function notFound($service = false, $message = false, $statusCode = 404) {
+	protected function notFound($message = false, $statusCode = 404, $service = false) {
 		return FrontController::notFound($service, $message, $statusCode);
 	}
 
@@ -578,7 +589,5 @@ class Base {
 		$url = $this->getDocUrlForPage();
 
 		return header("Location: $url");
-
-		die($url);
 	}
 }

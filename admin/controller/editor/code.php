@@ -25,9 +25,10 @@ namespace Vvveb\Controller\Editor;
 use function Vvveb\__;
 use Vvveb\Controller\Base;
 use function Vvveb\sanitizeFileName;
-use Vvveb\System\Core\View;
 
 class Code extends Base {
+	protected $saveDenyExtensions = ['php', 'tpl'];
+
 	function dirForType($type) {
 		switch ($type) {
 			case 'public':
@@ -53,16 +54,15 @@ class Code extends Base {
 	}
 
 	function index() {
-		$type                = $this->request->get['type'];
-		$admin_path          = \Vvveb\adminPath();
-		$controllerPath      = $admin_path . 'index.php?module=editor/code';
+		$type           = $this->request->get['type'];
+		$admin_path     = \Vvveb\adminPath();
+		$controllerPath = $admin_path . 'index.php?module=editor/code';
 
-		$this->view->scanUrl       = "$controllerPath&action=scan&type=$type";
-		$this->view->uploadUrl     = "$controllerPath&action=upload&type=$type";
-		$this->view->saveUrl       = "$controllerPath&action=save&type=$type";
-		$this->view->loadFileUrl   = "$controllerPath&action=loadFile&type=$type";
-		$this->view->saveUrl       = "$controllerPath&action=save&type=$type";
-		$this->view->type          = $type;
+		$this->view->scanUrl     = "$controllerPath&action=scan&type=$type";
+		$this->view->uploadUrl   = "$controllerPath&action=upload&type=$type";
+		$this->view->loadFileUrl = "$controllerPath&action=loadFile&type=$type";
+		$this->view->saveUrl     = "$controllerPath&action=save&type=$type";
+		$this->view->type        = $type;
 
 		if ($type) {
 			$this->view->mediaPath   = str_replace('/media', "/$type", $this->view->mediaPath);
@@ -70,11 +70,13 @@ class Code extends Base {
 	}
 
 	function sanitizeFileName($file, $type) {
+		$file = preg_replace("@^[\/]public@", '', $file);
+
 		if ($type == 'plugins') {
 			$file = DIR_PLUGINS . preg_replace("@^[\/]plugins[\/]@", '', $file);
 		} else {
 			if ($type == 'themes') {
-				$file = DIR_THEMES . $file;
+				$file = DIR_THEMES . preg_replace("@^[\/]themes[\/]@", '', $file);
 			} else {
 				$file = DIR_PUBLIC . $file;
 			}
@@ -93,18 +95,23 @@ class Code extends Base {
 
 		$message = ['success' => false, 'message' => sprintf(__('Error saving: %s!'), $file)];
 
-		if (! is_writable($file)) {
-			$message = ['success' => false, 'message' => sprintf(__('File not writable: %s Check if file has write permission.'), $file)];
+		$extension = strtolower(substr($file, strrpos($file, '.') + 1));
+
+		if (in_array($extension, $this->saveDenyExtensions)) {
+			$message = ['success' => false, 'message' => sprintf(__('Saving not allowed for file type %s!'), trim($extension, '.'))];
+			$success = false;
 		} else {
-			if (file_put_contents($file, $content)) {
-				$message = ['success' => true, 'message' => __('File saved!')];
+			if (! is_writable($file)) {
+				$message = ['success' => false, 'message' => sprintf(__('File not writable: %s Check if file has write permission.'), $file)];
+			} else {
+				if (file_put_contents($file, $content)) {
+					$message = ['success' => true, 'message' => __('File saved!')];
+				}
 			}
 		}
 
-		header('Content-type: application/json; charset=utf-8');
-		echo json_encode($message);
-
-		die();
+		$this->response->setType('json');
+		$this->response->output($message);
 	}
 
 	function loadFile() {
@@ -123,27 +130,6 @@ class Code extends Base {
 		die("Error loading: $file");
 	}
 
-	function upload() {
-		$type = $this->request->post['type'];
-		$path = sanitizeFileName($this->request->post['mediaPath']);
-		$file = sanitizeFileName($this->request->files['file']['name']);
-		$path = str_replace('/media', '', $path);
-
-		$destination = DIR_MEDIA . $path . '/' . $file;
-
-		if (move_uploaded_file($this->request->files['file']['tmp_name'], $destination)) {
-			if (isset($this->request->post['onlyFilename'])) {
-				echo $file;
-			} else {
-				echo $destination;
-			}
-		} else {
-			echo __('Error uploading file!');
-		}
-
-		die();
-	}
-
 	function scan() {
 		$type          = $this->request->get['type'] ?? 'public';
 		$scandir       = $this->dirForType($type);
@@ -159,10 +145,10 @@ class Code extends Base {
 			// Is there actually such a folder/file?
 
 			if (file_exists($dir)) {
-				$files = @scandir($dir);
+				$listdir = @scandir($dir);
 
-				if ($files) {
-					foreach ($files as $f) {
+				if ($listdir) {
+					foreach ($listdir as $f) {
 						if (! $f || $f[0] == '.' || $f == 'node_modules' || $f == 'vendor') {
 							continue; // Ignore hidden files
 						}
@@ -173,7 +159,7 @@ class Code extends Base {
 							$files[] = [
 								'name'  => $f,
 								'type'  => 'folder',
-								'path'  => str_replace($scandir, '', $dir) . DS . $f,
+								'path'  => str_replace([$scandir, '\\'], ['', '/'], $dir) . '/' . $f,
 								'items' => $scan($dir . DS . $f), // Recursively get the contents of the folder
 							];
 						} else {
@@ -182,7 +168,7 @@ class Code extends Base {
 							$files[] = [
 								'name' => $f,
 								'type' => 'file',
-								'path' => str_replace($scandir, '', $dir) . DS . $f,
+								'path' => str_replace([$scandir, '\\'], ['', '/'], $dir) . '/' . $f,
 								'size' => filesize($dir . DS . $f), // Gets the size of this file
 							];
 						}
@@ -196,20 +182,12 @@ class Code extends Base {
 		$response = $scan($scandir);
 
 		// Output the directory listing as JSON
-		$view         = View::getInstance();
-		$view->noJson = true;
-
-		header('Content-type: application/json');
-
-		echo json_encode([
+		$this->response->setType('json');
+		$this->response->output([
 			'name'  => '',
 			'type'  => 'folder',
 			'path'  => '',
 			'items' => $response,
 		]);
-
-		die();
-
-		return false;
 	}
 }

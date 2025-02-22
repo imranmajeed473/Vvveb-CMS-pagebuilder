@@ -108,27 +108,30 @@ class Product extends Edit {
 
 	function save() {
 		$post                    = &$this->request->post;
-		$post['shipping']        = isset($post['shipping']) ? 1 : 0;
-		$post['manufacturer_id'] = isset($post['manufacturer_id']) ? ($post['manufacturer_id'] ?: 0) : null;
-		$post['vendor_id']       = isset($post['vendor_id']) ? ($post['vendor_id'] ?: 0) : null;
+
+		$post['requires_shipping'] = isset($post['requires_shipping']) ? 1 : 0;
+		$post['manufacturer_id']   = isset($post['manufacturer_id']) ? ($post['manufacturer_id'] ?: 0) : null;
+		$post['vendor_id']         = isset($post['vendor_id']) ? ($post['vendor_id'] ?: 0) : null;
 
 		parent::save();
 
 		$this->product_id = $this->request->get[$this->object . '_id'] ?? $post[$this->object . '_id'] ?? false;
 
-		$this->saveOptions();
+		if ($this->product_id) {
+			$this->saveOptions();
 
-		$product          = new ProductSQL();
-		$features         = ['related', 'variant', 'subscription', 'discount', 'promotion', 'points', 'attribute', 'digital_asset'];
+			$product          = new ProductSQL();
+			$features         = ['related', 'variant', 'subscription', 'discount', 'promotion', 'points', 'attribute', 'digital_asset'];
 
-		foreach ($features as $feature) {
-			$feature = $this->object . '_' . $feature; //eg: product_related
-			$data    = $this->request->post[$feature] ?? [];
+			foreach ($features as $feature) {
+				$feature = $this->object . '_' . $feature; //eg: product_related
+				$data    = $this->request->post[$feature] ?? [];
 
-			if ($data) {
-				$fn = lcfirst(dashesToCamelCase($feature, '_')); //eg: $product->productRelated()
-				unset($data['#']);
-				$product->$fn([$this->object . '_id' => $this->product_id, $feature => array_unique($data, SORT_REGULAR)]);
+				if ($data) {
+					$fn = lcfirst(dashesToCamelCase($feature, '_')); //eg: $product->productRelated()
+					unset($data['#']);
+					$product->$fn([$this->object . '_id' => $this->product_id, $feature => array_unique($data, SORT_REGULAR)]);
+				}
 			}
 		}
 
@@ -174,8 +177,9 @@ class Product extends Edit {
 
 		$view->product['manufacturer_id'] = (($view->product['manufacturer_id'] ?? 0) ? $view->product['manufacturer_id'] : '');
 		$view->product['vendor_id']       = (($view->product['vendor_id'] ?? 0) ? $view->product['vendor_id'] : '');
-		$data['subtract']                 = [1 => __('Yes'), 0 => __('No')]; //Subtract stock options
-		$data['status']                   = [0 => __('Disabled'), 1 => __('Enabled')]; //Subtract stock options
+		$view->product['status']          = $view->product['status'] ?? 1;
+		$data['subtract_stock']           = [1 => __('Yes'), 0 => __('No')]; //Subtract stock options
+		$data['status']                   = [0 => __('Disabled'), 1 => __('Enabled')];
 		$view->set($data);
 	}
 }

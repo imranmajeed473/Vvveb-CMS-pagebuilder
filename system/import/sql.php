@@ -26,7 +26,9 @@ use function Vvveb\globBrace;
 
 #[\AllowDynamicProperties]
 class Sql {
-	public $db;
+	private $db;
+
+	private $prefix;
 
 	function __construct($driver = DB_ENGINE, $host = DB_HOST, $dbname = DB_NAME, $user = DB_USER, $pass = DB_PASS, $port = DB_PASS, $prefix = DB_PREFIX) {
 		$this->sqlPath = DIR_ROOT . "install/sql/$driver/";
@@ -147,19 +149,25 @@ class Sql {
 					}
 				}
 
-				return $result;
+				$return = $this->db->insert_id ?: $this->db->affected_rows ?: $result;
+
+				if (! $return && ! $this->db->errorCode()) {
+					$return = true;
+				}
+
+				return $return;
 			}
 		}
 
 		return true;
 	}
 
-	function createTables() {
+	function createTables($files = []) {
 		if (DB_ENGINE == 'sqlite') {
 			//try to speed up install
 			$query       = 'pragma journal_mode = WAL;pragma synchronous = normal;pragma temp_store = memory;pragma mmap_size = 30000000000;PRAGMA writable_schema = 1;';
 			$this->db->query($query , 'journal_mode WAL');
-			
+
 			//check if sql file has minimum version and if current version is supported
 			//$currentVersion = \SQLite3::version()['versionString'] ?? '3.0.0';
 			//$fts5Support = (version_compare($currentVersion,'3.9.0') >= 0);
@@ -183,7 +191,9 @@ class Sql {
 		$glob   = ['', '*/*/', '*/'];
 
 		//$files = glob($name, GLOB_BRACE);
-		$files = globBrace($this->sqlPath, ['', '**/'], '*.sql');
+		if (!$files) {
+			$files = globBrace($this->sqlPath, ['', '**/', '*/*/'], '*.sql');
+		}
 
 		foreach ($files as $filename) {
 			$sql      = file_get_contents($filename);
@@ -244,7 +254,7 @@ class Sql {
 		$glob   = ['', '*/*/', '*/'];
 
 		//$files = glob($name, GLOB_BRACE);
-		$files = globBrace($this->sqlPath, ['', '**/'], '*.sql');
+		$files = globBrace($this->sqlPath, ['', '**/', '*/*/'], '*.sql');
 
 		foreach ($files as $filename) {
 			$name = basename($filename);

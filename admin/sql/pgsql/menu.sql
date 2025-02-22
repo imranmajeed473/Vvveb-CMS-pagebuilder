@@ -10,7 +10,7 @@
 		IN  site_id INT,
 			
 		-- return menus count for count query
-		OUT fetch_row,
+		OUT fetch_row
 	)
 	BEGIN
 
@@ -34,7 +34,7 @@
 		IN  name CHAR,
 			
 		-- return menus count for count query
-		OUT affected_rows,
+		OUT affected_rows
 	)
 	BEGIN
 
@@ -53,16 +53,16 @@
 		IN  menu ARRAY,
 			
 		-- return menus count for count query
-		OUT insert_id,
+		OUT fetch_one
 	)
 	BEGIN
-		@FILTER(:menu, menu);
+		@FILTER(:menu, menu)
 
 		INSERT INTO menu 
 			
 			( @KEYS(:menu) )
 			
-	  	VALUES ( :menu );
+	  	VALUES ( :menu ) RETURNING menu_id;
 
 	END
 	
@@ -90,14 +90,12 @@
 	
 	-- get all menus 
 
-	CREATE PROCEDURE getMenusList(
+	CREATE PROCEDURE getAll(
 
 		-- variables
 		IN  language_id INT,
 		IN  menu_id INT,
 		IN  site_id INT,
-		IN  post_id INT,
-		IN  search CHAR,
 		IN  type CHAR,
 		
 		-- pagination
@@ -113,10 +111,19 @@
 
 		SELECT  *, menu.menu_id as array_key
 			
-			FROM menu AS menu
+			FROM menu
 			
+			@IF isset(:menu_id)
+			THEN 
+				WHERE menu.menu_id IN (:menu_id)
+			END @IF			
 		
-		@SQL_LIMIT(:start, :limit);
+			-- limit
+			@IF isset(:limit)
+			THEN
+				@SQL_LIMIT(:start, :limit)
+			END @IF;
+			
 		
 		SELECT count(*) FROM (
 			
@@ -125,12 +132,12 @@
 		) as count;
 
 
-	END -- get all menus 	
+	END
 	
 	
-	-- get all menus 
+	-- get menu 
 
-	CREATE PROCEDURE getMenus(
+	CREATE PROCEDURE get(
 
 		-- variables
 		IN  language_id INT,
@@ -146,17 +153,17 @@
 		-- return array of menus for menus query
 		OUT fetch_all,
 		-- return menus count for count query
-		-- OUT fetch_one,
+		-- OUT fetch_one
 	)
 	BEGIN
 
-		SELECT td.*,menus.url, menus.sort_order, menus.parent_id, menus.type, menus.item_id, menus.menu_item_id as array_key
+		SELECT td.*,menu.url, menu.sort_order, menu.parent_id, menu.type, menu.item_id, menu.menu_item_id as array_key
 			
 		
-			FROM menu_item AS menus
+			FROM menu_item AS menu
 		
-			-- INNER JOIN menu_to_site c2s ON (menus.menu_id = c2s.menu_id AND c2s.site_id = :site_id) 
-			INNER JOIN menu_item_content td ON (menus.menu_item_id = td.menu_item_id AND td.language_id = :language_id)  
+			-- INNER JOIN menu_to_site c2s ON (menu.menu_id = c2s.menu_id AND c2s.site_id = :site_id) 
+			INNER JOIN menu_item_content td ON (menu.menu_item_id = td.menu_item_id AND td.language_id = :language_id)  
 			
 			WHERE 
 			
@@ -166,18 +173,18 @@
 			@IF isset(:menu_id)
 			THEN 
 			
-				AND menus.menu_id = :menu_id
+				AND menu.menu_id = :menu_id
 				
 			END @IF			
 			
 			@IF isset(:slug)
 			THEN 
 			
-				AND menus.menu_id = (SELECT menu_id FROM menu WHERE slug = :slug LIMIT 1)
+				AND menu.menu_id = (SELECT menu_id FROM menu WHERE slug = :slug LIMIT 1)
 				
 			END @IF			
 
-		ORDER BY menus.parent_id, menus.sort_order, menus.menu_id
+		ORDER BY menu.parent_id, menu.sort_order, menu.menu_id
 
 		@IF isset(:limit)
 		THEN 
@@ -266,7 +273,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		:menu_item_content_data = @FILTER(:menu_item.menu_item_content, menu_item_content);
+		:menu_item_content_data = @FILTER(:menu_item.menu_item_content, menu_item_content)
 
 		@EACH(:menu_item_content_data) 
 			INSERT INTO menu_item_content 
@@ -274,10 +281,10 @@
 				( @KEYS(:each), menu_item_id)
 			
 			VALUES ( :each, :menu_item_id)
-				ON DUPLICATE KEY UPDATE @LIST(:each);
+			ON CONFLICT ("menu_item_id","language_id") DO UPDATE SET @LIST(:each);
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:menu_item, menu_item);
+		@FILTER(:menu_item, menu_item)
 		
 		UPDATE menu_item 
 			
@@ -292,19 +299,20 @@
 
 	CREATE PROCEDURE addMenuItem(
 		IN menu_item ARRAY,
+		OUT fetch_one,
 		OUT insert_id
 	)
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:menu_item_content_data = @FILTER(:menu_item.menu_item_content, menu_item_content);
-		:menu_item_data  = @FILTER(:menu_item, menu_item);
+		:menu_item_content_data = @FILTER(:menu_item.menu_item_content, menu_item_content)
+		:menu_item_data  = @FILTER(:menu_item, menu_item)
 
 		INSERT INTO menu_item 
 		
 			( @KEYS(:menu_item_data) )
 			
-		VALUES ( :menu_item_data );
+		VALUES ( :menu_item_data ) RETURNING menu_item_id;
 			
 		
 		@EACH(:menu_item_content_data) 
@@ -314,8 +322,6 @@
 			
 			VALUES ( @result.menu_item, :each );
 			
-	 
-        SELECT @menu_item as menu_item;
 	END
 
 	-- Reorder menu items
@@ -326,7 +332,7 @@
 	)
 	BEGIN
 		
-		:menu_item_data  = @FILTER(:menu_items, menu_item);
+		:menu_item_data  = @FILTER(:menu_items, menu_item)
 		
 		@EACH(:menu_item_data) 
 			UPDATE menu_item
@@ -337,9 +343,9 @@
 		
 	END	
 	
-	-- Delete menu item
+	-- Delete menu item recursive
 
-	CREATE PROCEDURE deleteMenuItem(
+	CREATE PROCEDURE deleteMenuItemRecursive(
 		IN menu_item_id INT,
 		OUT affected_rows,
 		OUT affected_rows,
@@ -379,5 +385,23 @@
 					 JOIN tree t ON t.menu_item_id = p.parent_id
 				)
 		SELECT menu_item_id FROM tree);
+		
+	END
+	
+	-- Delete menu item
+
+	CREATE PROCEDURE deleteMenuItem(
+		IN menu_item_id INT,
+		OUT affected_rows,
+		OUT affected_rows
+	)
+	BEGIN
+	
+		-- does not delete grand child menu items
+		DELETE FROM menu_item_content WHERE menu_item_id IN (SELECT menu_item_id FROM menu_item WHERE parent_id = :menu_item_id);
+		DELETE FROM menu_item_content WHERE menu_item_id = :menu_item_id;
+
+		DELETE FROM menu_item WHERE menu_item_id IN (SELECT menu_item_id FROM menu_item WHERE parent_id = :menu_item_id);
+		DELETE FROM menu_item WHERE menu_item_id = :menu_item_id;
 		
 	END

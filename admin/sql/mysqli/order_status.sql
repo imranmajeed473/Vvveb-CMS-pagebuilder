@@ -1,6 +1,6 @@
--- Currencies
+-- Order status
 
-	-- get all order status
+	-- get all order statuses
 
 	PROCEDURE getAll(
 		IN language_id INT,
@@ -10,9 +10,8 @@
 		OUT fetch_one,
 	)
 	BEGIN
-		-- order_status
 		SELECT *
-			FROM order_status AS order_status WHERE 1 = 1
+			FROM order_status WHERE 1 = 1
 			
 		@IF !empty(:language_id) 
 		THEN			
@@ -51,7 +50,7 @@
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:order_status_data  = @FILTER(:order_status, order_status);
+		:order_status_data  = @FILTER(:order_status, order_status)
 		
 		
 		INSERT INTO order_status 
@@ -71,7 +70,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:order_status, order_status);
+		@FILTER(:order_status, order_status)
 
 		UPDATE order_status 
 			

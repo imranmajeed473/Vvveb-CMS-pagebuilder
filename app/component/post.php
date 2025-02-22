@@ -23,11 +23,14 @@
 namespace Vvveb\Component;
 
 use function Vvveb\__;
+use function Vvveb\model;
 use function Vvveb\sanitizeHTML;
 use Vvveb\Sql\PostSQL;
 use Vvveb\System\Component\ComponentBase;
+use Vvveb\System\Core\Request;
 use Vvveb\System\Event;
 use Vvveb\System\Images;
+use Vvveb\System\User\Admin;
 use function Vvveb\url;
 
 class Post  extends ComponentBase {
@@ -70,13 +73,36 @@ class Post  extends ComponentBase {
 		$results['author-url']   = url('content/user/index', $results);
 		$results['comments-url'] = $results['url'] . '#comments';
 
+		//rfc
+		$results['pubDate'] = date('r', strtotime($results['created_at']));
+		$results['modDate'] = date('r', strtotime($results['updated_at']));
+
 		list($results) = Event :: trigger(__CLASS__,__FUNCTION__, $results);
 
 		return $results;
 	}
 
 	//called on each request
-	function request($results, $index = 0) {
+	function request(&$results, $index = 0) {
+		$request    = Request::getInstance();
+		$created_at = $request->get['created_at'] ?? ''; //revision preview
+
+		if ($created_at && $results['post_id']) {
+			//check if admin user to allow revision preview
+			$admin = Admin::current();
+
+			if ($admin) {
+				$revisions = model('post_content_revision');
+				$revision  = $revisions->get(['created_at' => $created_at, 'post_id' => $results['post_id'], 'language_id' => $results['language_id']]);
+
+				if ($revision && isset($revision['content'])) {
+					$results['content']    = $revision['content'];
+					$results['created_at'] = $revision['created_at'];
+				}
+			}
+		}
+
+		return $results;
 	}
 
 	//called by editor on page save for each component on page
@@ -85,6 +111,7 @@ class Post  extends ComponentBase {
 		$posts      = new PostSQL();
 		$publicPath = \Vvveb\publicUrlPath() . 'media/';
 
+		$post         = [];
 		$post_content = [];
 
 		foreach ($fields as $field) {
@@ -108,11 +135,16 @@ class Post  extends ComponentBase {
 				}
 			}
 		}
-		//$post['post_content']['post_id'] = $id;
-		$post_content['language_id'] = 1;
-		$post['post_content'][]      = $post_content;
-		$post['post_id']             = $id;
 
-		$result = $posts->edit(['post' => $post, 'post_id' => $id]);
+		if ($post) {
+			//$post['post_id'] = $id;
+			$result = $posts->edit(['post' => $post, 'post_id' => $id]);
+		}
+
+		if ($post_content) {
+			$post_content['language_id'] = self :: $global['language_id'];
+			//$post['post_content']['post_id'] = $id;
+			$result = $posts->editContent(['post_content' => $post_content, 'post_id' => $id, 'language_id' => self :: $global['language_id']]);
+		}
 	}
 }

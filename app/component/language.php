@@ -65,10 +65,10 @@ class Language extends ComponentBase {
 
 		$publicPath = \Vvveb\publicUrlPath();
 		$request    = Request::getInstance();
-		$view   	   = View::getInstance();
+		$view       = View::getInstance();
 
 		if ($results) {
-			$results['current']    = $code    = Session::getInstance()->get('language') ?? 'en_US';
+			$results['current']    = $code = $request->request['language'] ?? Session::getInstance()->get('language') ?? 'en_US';
 			$language              = $results['language'][$code] ?? [];
 
 			if (! $language) {
@@ -109,7 +109,7 @@ class Language extends ComponentBase {
 				//$url = getCurrentUrl();
 				if (true/* && $options['default'] != $code*/) {
 					$params               = $lang + $content + $get + ['host' => $_SERVER['HTTP_HOST'] ?? '', 'scheme' => $scheme];
-					$url                  = url($request->get['route'] ?? '', $params, false); //"/$shortcode" . getCurrentUrl();
+					$url                  = url($request->get['module'] ?? '', $params, false); //"/$shortcode" . getCurrentUrl();
 					$hreflang[$shortcode] = $url;
 				}
 

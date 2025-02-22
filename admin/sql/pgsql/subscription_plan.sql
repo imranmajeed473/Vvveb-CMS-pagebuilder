@@ -4,6 +4,7 @@
 
 	PROCEDURE getAll(
 		IN language_id INT,
+		IN subscription_plan_id ARRAY,
 		IN start INT,
 		IN limit INT,
 		OUT fetch_all, 
@@ -11,12 +12,17 @@
 	)
 	BEGIN
 		-- subscription_plan
-		SELECT subscription_plan.*,subscription_plan_content.name
-			FROM subscription_plan AS subscription_plan 
+		SELECT subscription_plan.*,subscription_plan_content.name,subscription_plan.subscription_plan_id as array_key
+			FROM subscription_plan 
 			INNER JOIN subscription_plan_content ON subscription_plan_content.subscription_plan_id = subscription_plan.subscription_plan_id 
 												 AND subscription_plan_content.language_id = :language_id
 		WHERE 1 = 1
-			
+
+		@IF isset(:subscription_plan_id)
+		THEN		
+			AND subscription_plan.subscription_plan_id IN (:subscription_plan_id)
+		END @IF
+
 		-- limit
 		@IF isset(:limit)
 		THEN		
@@ -29,7 +35,7 @@
 			
 		) as count;		
 			
-	END	
+	END
 	
 	-- get subscription plan
 
@@ -51,19 +57,19 @@
 
 	PROCEDURE add(
 		IN subscription_plan ARRAY,
-		OUT insert_id
+		OUT fetch_one
 	)
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:subscription_plan_data  = @FILTER(:subscription_plan, subscription_plan);
+		:subscription_plan_data  = @FILTER(:subscription_plan, subscription_plan)
 		
 		
 		INSERT INTO subscription_plan 
 			
 			( @KEYS(:subscription_plan_data) )
 			
-	  	VALUES ( :subscription_plan_data );
+	  	VALUES ( :subscription_plan_data ) RETURNING subscription_id;
 
 	END
 	
@@ -77,7 +83,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:subscription_plan, subscription_plan);
+		@FILTER(:subscription_plan, subscription_plan)
 
 		UPDATE subscription_plan
 			

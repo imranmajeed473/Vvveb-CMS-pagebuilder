@@ -28,7 +28,7 @@ use Vvveb\System\CacheManager;
 
 class Cache extends Base {
 	private function clear($fn) {
-		if (CacheManager :: $fn()) {
+		if ($fn()) {
 			$this->view->success[] = __('Cache deleted!');
 		} else {
 			$this->view->errors[] = __('Error purging cache!');
@@ -36,39 +36,58 @@ class Cache extends Base {
 
 		return $this->index();
 	}
-	
+
 	function delete() {
-		return $this->clear('delete');
+		return $this->clear(fn () => CacheManager :: delete());
 	}
 
 	function template() {
-		return $this->clear('clearCompiledFiles');
+		return $this->clear(fn () => CacheManager :: clearCompiledFiles());
 	}
 
 	function page() {
-		return $this->clear('clearPageCache');
+		return $this->clear(fn () => CacheManager :: clearPageCache($this->global['site_url']));
 	}
 
 	function database() {
-		return $this->clear('clearObjectCache');
+		return $this->clear(fn () => CacheManager :: clearObjectCache());
 	}
 
 	function asset() {
-		return $this->clear('clearFrontend');
+		return $this->clear(fn () => CacheManager :: clearFrontend());
 	}
-	
+
 	function model() {
-		return $this->clear('clearModelCache');
+		return $this->clear(fn () => CacheManager :: clearModelCache());
 	}
 
 	function image() {
-		return $this->clear('clearImageCache');
+		return $this->clear(fn () => CacheManager :: clearImageCache());
 	}
 
 	function stale() {
 		return $this->index();
 	}
-	
+
 	function index() {
+		$folders = [
+			'/public/page-cache'          => DIR_PUBLIC . PAGE_CACHE_DIR,
+			'/public/image-cache'         => DIR_PUBLIC . DS . 'image-cache',
+			'/storage/model/app'          => DIR_STORAGE . 'model' . DS . 'app',
+			'/storage/model/admin'        => DIR_STORAGE . 'model' . DS . 'admin',
+			'/storage/compiled_templates' => DIR_COMPILED_TEMPLATES,
+		];
+
+		$unwritable = [];
+
+		foreach ($folders as $folder => $path) {
+			if (! is_writable($path)) {
+				$unwritable[] = $folder;
+			}
+		}
+
+		if ($unwritable) {
+			$this->view->info[] = sprintf('Folders <b>%s</b> are not writable, clear cache might not work for these layers', implode(', ', $unwritable));
+		}
 	}
 }

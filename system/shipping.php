@@ -31,6 +31,8 @@ class Shipping {
 
 	private $instances = [];
 
+	private $instance;
+
 	public static function getInstance($options = []) {
 		static $inst = null;
 
@@ -44,13 +46,14 @@ class Shipping {
 	public function __construct($options = []) {
 	}
 
-	public function getMethods() {
+	public function getMethods($checkoutInfo) {
 		$data = [];
 
-		foreach ($this->methods as $name => $class) {
-			$obj                    = new $class(Cart::getInstance());
-			$this->instances[$name] = $obj;
-			$shippingData           = $obj->getMethod();
+		foreach ($this->methods as $name => $method) {
+			list($class, $options)          = $method;
+			$obj                            = new $class(Cart::getInstance());
+			$this->instances[$name]         = $obj;
+			$shippingData                   = $obj->getMethod($checkoutInfo, $options);
 			//if shipping method returns false or no data then don't add it to the list
 			if ($shippingData) {
 				$data[$name] = $shippingData;
@@ -60,14 +63,24 @@ class Shipping {
 		return $data;
 	}
 
-	public function registerMethod($method, $class) {
-		$this->methods[$method] = $class;
+	public function registerMethod($method, $class, $options = []) {
+		$this->methods[$method] = [$class, $options];
 	}
 
 	public function setMethod($method) {
 		foreach ($this->instances as $instance) {
 			$instance->init();
 		}
-		$this->instances[$method]->setMethod();
+
+		if (isset($this->instances[$method])) {
+			$this->instance = $this->instances[$method];
+			$this->instance->setMethod();
+		}
+	}
+
+	public function ship(&$checkoutInfo = []) {
+		if ($this->instance) {
+			$this->instance->ship($checkoutInfo);
+		}
 	}
 }

@@ -13,9 +13,9 @@
 	BEGIN
 		-- country
 		SELECT *
-			FROM country AS country WHERE 1 = 1
+			FROM country WHERE 1 = 1
 			
-		@IF !empty(:status) 
+		@IF isset(:status) AND :status != "" 
 		THEN			
 			AND status = :status
 		END @IF		
@@ -58,20 +58,19 @@
 
 	PROCEDURE add(
 		IN country ARRAY,
-		IN language_id INT,
-		OUT insert_id
+		OUT fetch_one
 	)
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:country_data  = @FILTER(:country, country);
+		:country_data  = @FILTER(:country, country)
 		
 		
 		INSERT INTO country 
 			
 			( @KEYS(:country_data) )
 			
-	  	VALUES ( :country_data );
+	  	VALUES ( :country_data ) RETURNING country_id;
 
 	END
 	
@@ -85,7 +84,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:country, country);
+		@FILTER(:country, country)
 
 		UPDATE country 
 			

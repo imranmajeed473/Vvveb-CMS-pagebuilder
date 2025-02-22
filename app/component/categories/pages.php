@@ -28,11 +28,11 @@ use Vvveb\System\Event;
 class Pages extends ComponentBase {
 	public static $defaultOptions = [
 		'start'                    => 0,
+		'limit'                    => 7,
 		'count'                    => ['url', 100],
-		'id_manufacturer'          => NULL,
+		'site_id'         		       => NULL,
 		'order'                    => ['url', 'price asc'],
 		'taxonomy_item_id'         => NULL,
-		'limit'                    => 7,
 		'page'                     => 1,
 		'parents_only'             => false,
 		'parents_children_only'    => false,
@@ -58,7 +58,6 @@ class Pages extends ComponentBase {
 
 			break;
 		}
-
 		//count the number of child categories (subcategories) for each category
 		if (isset($results['categories'])) {
 			foreach ($results['categories'] as $taxonomy_item_id => &$category) {
@@ -74,11 +73,11 @@ class Pages extends ComponentBase {
 					$category['children'] = 0;
 				}
 
-				if (isset($category['posts']) && $category['posts'] && $category['posts'][0] = '[') {
-					$category['posts'] = json_decode($category['posts'], true);
+				if (isset($category['post']) && $category['post'] && $category['post'][0] = '[') {
+					$category['post'] = json_decode($category['post'], true);
 
-					if (is_array($category['posts'])) {
-						$category['posts_count'] = count($category['posts']);
+					if (is_array($category['post'])) {
+						$category['posts_count'] = count($category['post']);
 					}
 				}
 

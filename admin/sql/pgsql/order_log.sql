@@ -12,7 +12,7 @@
 	BEGIN
 		-- order_log
 		SELECT *
-			FROM order_log AS order_log WHERE 1 = 1
+			FROM order_log WHERE 1 = 1
 			
 		@IF !empty(:order_id) 
 		THEN			
@@ -46,19 +46,19 @@
 	PROCEDURE add(
 		IN order_log ARRAY,
 		IN order_id INT,
-		OUT insert_id
+		OUT fetch_one
 	)
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:order_log_data  = @FILTER(:order_log, order_log);
+		:order_log_data  = @FILTER(:order_log, order_log)
 		
 		
 		INSERT INTO order_log 
 			
 			( @KEYS(:order_log_data), order_id )
 			
-	  	VALUES ( :order_log_data, :order_id );
+	  	VALUES ( :order_log_data, :order_id ) RETURNING order_log_id;
 
 	END
 	
@@ -71,7 +71,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:order_log, order_log);
+		@FILTER(:order_log, order_log)
 
 		UPDATE order_log 
 			

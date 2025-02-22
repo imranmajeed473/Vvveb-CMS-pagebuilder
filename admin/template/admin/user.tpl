@@ -6,9 +6,9 @@ import(common.tpl)
 [data-v-user] input[data-v-user-*]|value = 
 <?php
 	 if (isset($_POST['@@__data-v-user-(*)__@@'])) 
-		echo $_POST['@@__data-v-user-(*)__@@']; 
+		echo htmlspecialchars($_POST['@@__data-v-user-(*)__@@']); 
 	 else if (isset($this->user['@@__data-v-user-(*)__@@'])) 
-		echo $this->user['@@__data-v-user-(*)__@@'];
+		echo htmlspecialchars($this->user['@@__data-v-user-(*)__@@']);
 ?>
 
 
@@ -16,9 +16,9 @@ import(common.tpl)
 [data-v-user] textarea[data-v-user-*] = 
 <?php
 	 if (isset($_POST['@@__data-v-user-(*)__@@'])) 
-		echo $_POST['@@__data-v-user-(*)__@@']; 
+		echo htmlspecialchars($_POST['@@__data-v-user-(*)__@@']); 
 	 else if (isset($this->user['@@__data-v-user-(*)__@@'])) 
-		echo $this->user['@@__data-v-user-(*)__@@'];
+		echo htmlspecialchars($this->user['@@__data-v-user-(*)__@@']);
 ?>/* textarea elements */
 
 
@@ -51,7 +51,7 @@ import(common.tpl)
 
 /* Site access */
 
-#all-sites-check|addNewAttribute = <?php if (empty($this->user['site_access'])) echo 'checked';?>
+#all-sites-check|addNewAttribute = <?php if (!isset($this->user['site_access']) || empty($this->user['site_access'])) echo 'checked';?>
 
 [data-v-sites] [data-v-site]|deleteAllButFirstChild
 
@@ -61,7 +61,7 @@ if(isset($this->sitesList) && is_array($this->sitesList)) {
 	foreach ($this->sitesList as $index => $site) { ?>
 	
 	[data-v-sites] [data-v-site] [data-v-*]|innerText = $site['@@__data-v-(*)__@@']
-	[data-v-sites] [data-v-site] input[type="checkbox"]|addNewAttribute = <?php if (in_array($site['site_id'], $this->user['site_access'])) echo 'checked';?>
+	[data-v-sites] [data-v-site] input[type="checkbox"]|addNewAttribute = <?php if (isset($this->user['site_access']) && in_array($site['site_id'], $this->user['site_access'])) echo 'checked';?>
 
 	
 	[data-v-sites]  [data-v-site]|after = <?php

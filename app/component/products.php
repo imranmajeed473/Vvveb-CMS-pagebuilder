@@ -22,6 +22,7 @@
 
 namespace Vvveb\Component;
 
+use function Vvveb\getCurrency;
 use Vvveb\System\Cart\Currency;
 use Vvveb\System\Cart\Tax;
 use Vvveb\System\Component\ComponentBase;
@@ -42,16 +43,19 @@ class Products extends ComponentBase {
 		'parent'           => null,
 		'manufacturer_id'  => NULL,
 		'vendor_id'        => NULL,
-		'order_by'         => NULL,
-		'direction'        => ['url', 'asc', 'desc'],
 		'taxonomy_item_id' => NULL,
 		'product_image'    => true,
 		'product_id'       => [],
 		'search'           => null,
+		'search_boolean'   => true,
+		'like'             => null,
 		'slug'             => null,
 		'related'          => null,
 		'variant'          => null,
 		'image_size'       => 'medium',
+		'filter'           => null,
+		'order_by'         => NULL,
+		'direction'        => ['url', 'asc', 'desc'],
 	];
 
 	public $options = [];
@@ -63,7 +67,12 @@ class Products extends ComponentBase {
 			$this->options['start'] = ($page - 1) * $this->options['limit'];
 		}
 
-		if ($this->options['related']) {
+		if ($this->options['filter']) {
+			foreach ($this->options['filter'] as $name => $values) {
+				if ($name == 'manufacturer_id' || $name == 'vendor_id') {
+					$this->options[$name] = $values;
+				}
+			}
 		}
 
 		if (isset($this->options['product_id']) &&
@@ -91,13 +100,28 @@ class Products extends ComponentBase {
 			$this->options['slug'] = [$this->options['slug']];
 		}
 
-		$results = $products->getAll($this->options) + $this->options;
+		//if only one manufacturer_id is provided then add it to array
+		if (isset($this->options['manufacturer_id']) && ! is_array($this->options['manufacturer_id'])) {
+			$this->options['manufacturer_id'] = [$this->options['manufacturer_id']];
+		}
 
-		if ($results && isset($results['products'])) {
+		//if only one vendor_id is provided then add it to array
+		if (isset($this->options['vendor_id']) && ! is_array($this->options['vendor_id'])) {
+			$this->options['vendor_id'] = [$this->options['vendor_id']];
+		}
+
+		if ($this->options['search'] && $this->options['search_boolean']) {
+			$this->options['search'] .= '*';
+		}
+
+		$results         = $products->getAll($this->options) + $this->options;
+		$currentCurrency = getCurrency();
+
+		if ($results && isset($results['product'])) {
 			$tax      = Tax::getInstance($this->options);
 			$currency = Currency::getInstance($this->options);
 
-			foreach ($results['products'] as $id => &$product) {
+			foreach ($results['product'] as $id => &$product) {
 				$language = [];
 
 				if ($product['language_id'] != $this->options['default_language_id']) {
@@ -119,8 +143,10 @@ class Products extends ComponentBase {
 
 				//rfc
 				$product['pubDate'] = date('r', strtotime($product['created_at']));
+				$product['modDate'] = date('r', strtotime($product['updated_at']));
+				$product['lastMod'] = date('Y-m-d\TH:i:sP', strtotime($product['updated_at']));
 
-				$url                         =  ['slug' => $product['slug'], 'product_id' => $product['product_id']] + $language;
+				$url                         = ['slug' => $product['slug'], 'product_id' => $product['product_id']] + $language;
 				$product['url']      	       = url('product/product/index', $url);
 				$product['add_cart_url']     = url('cart/cart/add', ['product_id' => $product['product_id']]);
 				$product['buy_url']          = url('checkout/checkout/index', ['product_id' => $product['product_id']]);
@@ -131,8 +157,13 @@ class Products extends ComponentBase {
 				$product['price_tax']           = $tax->addTaxes($product['price'], $product['tax_type_id']);
 				$product['price_tax_formatted'] = $currency->format($product['price_tax']);
 				$product['price_formatted']     = $currency->format($product['price']);
+				$product['price_currency']      = $currentCurrency;
 			}
 		}
+
+		$results['limit']  = $this->options['limit'];
+		$results['start']  = $this->options['start'];
+		$results['search'] = $this->options['search'];
 
 		list($results) = Event :: trigger(__CLASS__,__FUNCTION__, $results);
 

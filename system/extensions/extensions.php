@@ -39,6 +39,10 @@ abstract class Extensions {
 
 	static protected $baseDir = 'extension';
 
+	static protected $url;
+
+	static protected $feedUrl;
+
 	const KEY_VALUE_REGEX = '/^([\w ]+):\s+(.+)$/m';
 
 	static function getParams($comments) {
@@ -115,7 +119,7 @@ abstract class Extensions {
 			}
 
 			// plugin folder does not match slug
-			if ($info['slug'] != $info['folder']) {
+			if (! isset($info['slug']) || ($info['slug'] != $info['folder'])) {
 				$info['status'] = 'slug_folder_mismatch';
 				$info['slug']   = $info['folder'];
 			}

@@ -2,7 +2,8 @@ DROP TABLE IF EXISTS `order`;
 
 CREATE TABLE `order` (
 `order_id` INTEGER PRIMARY KEY AUTOINCREMENT,
-`invoice_no` INT NOT NULL DEFAULT '0',
+`invoice_no` TEXT NOT NULL DEFAULT '0',
+`customer_order_id` TEXT NOT NULL DEFAULT '0',
 `invoice_prefix` TEXT NOT NULL DEFAULT 'I-',
 `site_id` TINYINT NOT NULL DEFAULT '0',
 `site_name` TEXT NOT NULL,
@@ -26,8 +27,9 @@ CREATE TABLE `order` (
 `billing_region_id` INT NOT NULL,
 `billing_address_format` text NOT NULL  DEFAULT '',
 `billing_fields` text NOT NULL DEFAULT '',
-`payment_method` text NOT NULL,
+`payment_method` text NOT NULL DEFAULT '',
 `payment_data` text,
+`payment_status_id` INT NOT NULL DEFAULT '1',
 `shipping_first_name` TEXT NOT NULL DEFAULT '',
 `shipping_last_name` TEXT NOT NULL DEFAULT '',
 `shipping_company` TEXT NOT NULL DEFAULT '',
@@ -41,13 +43,14 @@ CREATE TABLE `order` (
 `shipping_region_id` INT NOT NULL DEFAULT 0,
 `shipping_address_format` text NOT NULL NULL DEFAULT '',
 `shipping_fields` text NOT NULL NULL DEFAULT '',
-`shipping_method` TEXT NOT NULL,
+`shipping_method` TEXT NOT NULL DEFAULT '',
 `shipping_data` TEXT NOT NULL NULL DEFAULT '',
+`shipping_status_id` INT NOT NULL DEFAULT '1',
 `total` decimal(15,4) NOT NULL DEFAULT '0.0000',
 `order_status_id` INT NOT NULL DEFAULT '0',
 `language_id` INT NOT NULL,
 `currency_id` INT NOT NULL,
-`currency_code` TEXT NOT NULL NULL DEFAULT '',
+`currency` TEXT NOT NULL NULL DEFAULT '',
 `currency_value` decimal(15,8) NOT NULL DEFAULT '1.00000000',
 `notes` text NOT NULL NULL DEFAULT '',
 `remote_ip` TEXT NOT NULL DEFAULT '',
@@ -57,3 +60,6 @@ CREATE TABLE `order` (
 `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
 -- PRIMARY KEY (`order_id`)
 );
+
+CREATE INDEX `order_order_status_id` ON `order` (`site_id`,`order_status_id`,`created_at`);
+CREATE INDEX `order_customer_order_id` ON `order` (`customer_order_id`,`order_status_id`,`created_at`);

@@ -58,6 +58,8 @@ class View {
 
 	private $componentContent;
 
+	private $html;
+
 	private $useComponent;
 
 	private $isEditor = false;
@@ -80,18 +82,23 @@ class View {
 			$this->theme        = config(APP . '.theme', 'default');
 		}
 
+		if (isEditor()) {
+			$this->isEditor = true;
+		}
+
 		$domain = $this->theme . '-domain';
 		addTranslationDomain($domain);
 
 		$this->htmlPath     = DIR_THEME . $this->theme . DS;
 		$this->templatePath = DIR_THEME . $this->theme . DS; //\Vvveb\config(APP . '.theme', 'default') . DS;
 
-		if (isset($_REQUEST['_component_ajax'])) {
+		if (isset($_REQUEST['_component_ajax']) && $this->isEditor) {
 			$this->component        = \Vvveb\filter('/[a-z\-]*/', $_REQUEST['_component_ajax'], 15);
-			//$this->componentCount   = \Vvveb\filter('/\d+/', $_REQUEST['_component_id'],  2);
-			$this->componentCount   = 0;
+			$this->componentCount   = \Vvveb\filter('/\d+/', $_REQUEST['_component_id'],  2);
+			//$this->componentCount   = 0;
 			//if (isset($_REQUEST['_server_template'])) {
 			$this->componentContent = $_POST['_component_content'] ?? '';
+			$this->html             = $_POST['html'] ?? '';
 			//}
 		}
 
@@ -107,9 +114,9 @@ class View {
 
 		$template->addTemplatePath(DIR_TEMPLATE);
 		$template->addTemplatePath($this->htmlPath . 'template' . DS);
-		$template->htmlPath     =  $this->htmlPath;
+		$template->setHtmlPath($this->htmlPath);
 
-		if (isEditor()) {
+		if ($this->isEditor) {
 			$this->isEditor = true;
 			$template->removeVattrs(false);
 		}
@@ -137,7 +144,7 @@ class View {
 				$this->theme = config(APP . '.theme', 'default');
 			}
 		} else {
-			$theme       = \Vvveb\filter('/[a-z0-9-]*/', $theme, 15);
+			$theme       = \Vvveb\filter('/[a-z0-9-]*/', $theme, 30);
 			$this->theme = $theme;
 		}
 		$this->htmlPath       = DIR_THEME . $this->theme . DS;
@@ -146,6 +153,10 @@ class View {
 
 	function getTheme() {
 		return $this->theme;
+	}
+
+	function getDocumentType() {
+		return $this->templateEngine->getDocumentType();
 	}
 
 	function getTemplatePath() {
@@ -180,26 +191,33 @@ class View {
 		$templateFile      = $templatePath . $template;
 		$html              = DIR_TEMPLATE . $this->tplFile;
 
-		if (strpos($this->template, 'plugins' . DS) === 0) {
-			$templatePath = DIR_PUBLIC . 'plugins' . DS;
-			//$templatePath = $this->templatePath = DIR_PUBLIC . 'plugins' . DS;
+		//absolute path
+		if ($this->template[0] == '/') {
+			$templatePath = dirname($this->template) . '/';
+			$template     = basename($this->template);
+			$templateFile = $this->template;
+		} else {
+			if (strpos($this->template, 'plugins' . DS) === 0) {
+				$templatePath = DIR_PUBLIC . 'plugins' . DS;
+				//$templatePath = $this->templatePath = DIR_PUBLIC . 'plugins' . DS;
 
-			$template   = str_replace('plugins' . DS, '', $template);
-			$p          = strpos($template, DS);
-			$pluginName = substr($template, 0, $p);
-			$nameSpace  = substr($template, $p + 1);
+				$template   = str_replace('plugins' . DS, '', $template);
+				$p          = strpos($template, DS);
+				$pluginName = substr($template, 0, $p);
+				$nameSpace  = substr($template, $p + 1);
 
-			if (APP == 'admin') {
-				$tpl      = $pluginName . DS . join(DS, [APP, 'template']) . DS . $nameSpace;
-				$template = $pluginName . DS . APP . DS . $nameSpace;
-			} else {
-				$tpl      = $pluginName . DS . join(DS, [APP, 'template']) . DS . $nameSpace;
-				$template = $pluginName . DS . $nameSpace;
+				if (APP == 'admin') {
+					$tpl      = $pluginName . DS . join(DS, [APP, 'template']) . DS . $nameSpace;
+					$template = $pluginName . DS . APP . DS . $nameSpace;
+				} else {
+					$tpl      = $pluginName . DS . join(DS, [APP, 'template']) . DS . $nameSpace;
+					$template = $pluginName . DS . $nameSpace;
+				}
+
+				$this->tplFile      = str_replace('.html', '.tpl', $tpl);
+				$html               = DIR_PLUGINS . $this->tplFile;
+				$templateFile       = $templatePath . $template;
 			}
-
-			$this->tplFile      = str_replace('.html', '.tpl', $tpl);
-			$html               = DIR_PLUGINS . $this->tplFile;
-			$templateFile       = $templatePath . $template;
 		}
 
 		if (! file_exists($templatePath . $template)) {
@@ -246,45 +264,61 @@ class View {
 		if ($this->useComponent && ! defined('CLI')) {
 			//regenerate components cache
 			if (! $service) {
-				$service = Component::getInstance($this, true, $this->componentContent);
+				if ($this->html) {
+					$html = $this->html;
+				} else {
+					$html = $this->componentContent;
+				}
+
+				$service = Component::getInstance($this, true, $html);
 			}
 		}
 
 		list($this->template, $filename, $this->tplFile) =
-		Event :: trigger(__CLASS__,__FUNCTION__, $this->template, $filename, $this->tplFile,  $this->templateEngine, $this);
-		$errors = $this->templateEngine->loadHtmlTemplate($filename);
+		Event :: trigger(__CLASS__,__FUNCTION__, $this->template, $filename, $this->tplFile, $this->templateEngine, $this);
+
+		if ($this->html) {
+			$errors = $this->templateEngine->loadHtml($this->html);
+		} else {
+			$errors = $this->templateEngine->loadHtmlTemplate($filename);
+		}
 
 		//if no template defined use the default
-		if (strpos($this->template, 'plugins' . DS) === 0) {
-			//$template   = str_replace('plugins' . DS, '', $this->template);
-			$template   = $this->tplFile;
-			$p          = strpos($template, DS);
-			$pluginName = substr($template, 0, $p);
-			$nameSpace  = substr($template, $p + 1);
-
-			if (file_exists(DIR_PLUGINS . $this->tplFile)) {
-				$this->tplFile = DIR_PLUGINS . $this->tplFile;
-			} else {
-				$this->tplFile = DIR_TEMPLATE . 'common.tpl';
-			}
-
-			//$this->tplFile = $pluginName . DS . APP . DS . 'template' . DS . $nameSpace;
+		if ($this->tplFile[0] == '/') {
+			$this->tplFile = DIR_TEMPLATE . 'common.tpl';
 			$this->templateEngine->loadTemplateFile($this->tplFile);
-		/*
-		if (APP == 'admin') {
-			$this->tplFile = $pluginName . DS . APP ."/template/$nameSpace";
 		} else {
-			$this->tplFile = "$pluginName/admin/template/$nameSpace";
-		}*/
-		} else {
-			if (! file_exists(DIR_TEMPLATE . $this->tplFile)) {
-				$this->tplFile = 'common.tpl';
+			if (strpos($this->template, 'plugins' . DS) === 0) {
+				//$template   = str_replace('plugins' . DS, '', $this->template);
+				$template   = $this->tplFile;
+				$p          = strpos($template, DS);
+				$pluginName = substr($template, 0, $p);
+				$nameSpace  = substr($template, $p + 1);
+
+				if (file_exists(DIR_PLUGINS . $this->tplFile)) {
+					$this->tplFile = DIR_PLUGINS . $this->tplFile;
+				} else {
+					$this->tplFile = DIR_TEMPLATE . 'common.tpl';
+				}
+
+				//$this->tplFile = $pluginName . DS . APP . DS . 'template' . DS . $nameSpace;
+				$this->templateEngine->loadTemplateFile($this->tplFile);
+			/*
+			if (APP == 'admin') {
+				$this->tplFile = $pluginName . DS . APP ."/template/$nameSpace";
+			} else {
+				$this->tplFile = "$pluginName/admin/template/$nameSpace";
+			}*/
+			} else {
+				if (! file_exists(DIR_TEMPLATE . $this->tplFile)) {
+					$this->tplFile = 'common.tpl';
+				}
+				$this->templateEngine->loadTemplateFileFromPath($this->tplFile);
 			}
-			$this->templateEngine->loadTemplateFileFromPath($this->tplFile);
 		}
 
 		list($this->template, $filename, $this->tplFile) =
-		Event :: trigger(__CLASS__,__FUNCTION__ . ':after', $this->template, $filename, $this->tplFile,  $this->templateEngine, $this);
+		Event :: trigger(__CLASS__,__FUNCTION__ . ':after', $this->template, $filename, $this->tplFile, $this->templateEngine, $this);
 		$this->templateEngine->saveCompiledTemplate($file);
 	}
 
@@ -329,7 +363,7 @@ class View {
 		$this->_type = $type;
 	}
 
-	function getType($type) {
+	function getType() {
 		return $this->_type;
 	}
 

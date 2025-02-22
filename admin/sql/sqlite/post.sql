@@ -6,6 +6,7 @@
 		IN start INT,
 		IN limit INT,
 		IN search CHAR,
+		IN like CHAR,
 		IN username CHAR,
 		IN status CHAR,
 		IN taxonomy_item_slug CHAR,
@@ -27,6 +28,9 @@
 		IN tags INT,
 		IN taxonomy CHAR,
 		
+		IN order_by CHAR,
+		IN direction CHAR,
+
 		-- return array of posts for posts query
 		OUT fetch_all,
 		-- return posts count for count query
@@ -34,13 +38,13 @@
 	)
 	BEGIN
 
-		SELECT pd.*,posts.*,ad.username,ad.display_name,ad.admin_id,ad.email, ad.avatar, ad.bio, ad.first_name, ad.last_name
+		SELECT pd.*,post.*,ad.username,ad.display_name,ad.admin_id,ad.email, ad.avatar, ad.bio, ad.first_name, ad.last_name
 			@IF isset(:comment_count)
 			THEN
 				,(SELECT COUNT(c.comment_id) 
 						FROM comment c 
 					WHERE 
-						posts.post_id = c.post_id
+						post.post_id = c.post_id
 					
 						@IF isset(:comment_status)
 						THEN
@@ -52,9 +56,9 @@
 			END @IF
 			
 					
-		FROM post AS posts
+		FROM post
 			LEFT JOIN post_content pd ON (
-				posts.post_id = pd.post_id 
+				post.post_id = pd.post_id 
 				
 				@IF isset(:language_id)
 				THEN
@@ -62,12 +66,12 @@
 				END @IF
 
 			)  
-			LEFT JOIN post_to_site ps ON (posts.post_id = ps.post_id)  
-			LEFT JOIN admin ad ON (posts.admin_id = ad.admin_id)  
+			LEFT JOIN post_to_site ps ON (post.post_id = ps.post_id)  
+			LEFT JOIN admin ad ON (post.admin_id = ad.admin_id)  
 			
 			@IF isset(:taxonomy_item_id) || isset(:taxonomy_item_slug)
 			THEN
-				LEFT JOIN post_to_taxonomy_item pt ON (posts.post_id = pt.post_id)   
+				LEFT JOIN post_to_taxonomy_item pt ON (post.post_id = pt.post_id)   
 			END @IF			
 		
 			@IF isset(:search)
@@ -78,26 +82,26 @@
 		
 			@IF isset(:type) && !empty(:type)
 			THEN
-				AND posts.type = :type
+				AND post.type = :type
 			END @IF			
 			
 			@IF isset(:status) && !empty(:status)
 			THEN
-				AND posts.status = :status
+				AND post.status = :status
 			@ELSE
-				AND posts.status = 'publish'
+				AND post.status = 'publish'
 			END @IF
 			
 			-- username/author
 			@IF isset(:username)
 			THEN
-				AND posts.admin_id = (SELECT admin_id FROM admin WHERE username = :username LIMIT 1)
+				AND post.admin_id = (SELECT admin_id FROM admin WHERE username = :username LIMIT 1)
 			END @IF	
 			
 			-- admin_id
 			@IF isset(:admin_id)
 			THEN
-				AND posts.admin_id = :admin_id
+				AND post.admin_id = :admin_id
 			END @IF
 
             -- search
@@ -109,11 +113,17 @@
 				AND (post_content_search = :search) 
         	END @IF	     
             
+			-- like
+			@IF isset(:like) && !empty(:like)
+			THEN 
+				AND pd.name LIKE '%' || :like || '%'
+			END @IF  
+
             -- post_id
 			@IF isset(:post_id) && count(:post_id) > 0
 			THEN 
 			
-				AND posts.post_id IN (:post_id)
+				AND post.post_id IN (:post_id)
 				
 			END @IF		
 
@@ -143,21 +153,21 @@
 			-- month
 			@IF isset(:month) && !empty(:month)
 			THEN
-				AND strftime('%M', posts.created_at) = :month
+				AND strftime('%M', post.created_at) = :month
 			END @IF					
 
 			-- year
 			@IF isset(:year) && !empty(:year)
 			THEN
-				AND strftime('%Y', posts.created_at) = :year
+				AND strftime('%Y', post.created_at) = :year
 			END @IF					
 
-			-- order by
+			-- ORDER BY parameters can't be binded, because they are added to the query directly they must be properly sanitized by only allowing a predefined set of values
 			@IF isset(:order_by)
 			THEN
-				ORDER BY posts.$order_by $direction		
+				ORDER BY post.$order_by $direction		
 			@ELSE
-				ORDER BY posts.post_id DESC
+				ORDER BY post.post_id DESC
 			END @IF		
 			
 			-- limit
@@ -170,7 +180,7 @@
 		-- SELECT FOUND_ROWS() as count;
 		SELECT count(*) FROM (
 			
-			@SQL_COUNT(posts.post_id, post) -- this takes previous query removes limit and replaces select columns with parameter product_id
+			@SQL_COUNT(post.post_id, post) -- this takes previous query removes limit and replaces select columns with parameter product_id
 			
 		) as count;
 	 
@@ -188,14 +198,15 @@
 		IN admin_id INT,
 		IN type CHAR,
 		
-		OUT fetch_row,
-		OUT fetch_row,
-		OUT fetch_all,
-		OUT fetch_all,
+		OUT fetch_row, -- post
+		OUT fetch_all, -- content
+		OUT fetch_all, -- meta
+		OUT fetch_all, -- post_to_site
+		OUT fetch_all, -- post_to_taxonomy_item
 	)
 	BEGIN
 
-		SELECT _.*,pd.*,ad.admin_id,ad.username,ad.display_name,ad.email
+		SELECT _.*,pd.*,_.post_id,ad.admin_id,ad.username,ad.display_name,ad.email
 		
 		@IF isset(:comment_count)
 			THEN
@@ -228,12 +239,12 @@
 			
 		WHERE 1 = 1
 
-            @IF isset(:slug)
+            @IF isset(:slug) && !(isset(:post_id) && :post_id) 
 			THEN 
 				AND pd.slug = :slug 
         	END @IF			
 
-            @IF isset(:post_id)
+            @IF isset(:post_id) && :post_id > 0
 			THEN
                 AND _.post_id = :post_id
         	END @IF			
@@ -252,7 +263,7 @@
 		
 		-- content
 		SELECT *, language_id as array_key -- (underscore) _ column means that this column (language_id) value will be used as array key when adding row to result array
-			FROM post_content AS post_content 
+			FROM post_content 
 		WHERE post_id = @result.post_id;
 		
 	 
@@ -264,19 +275,28 @@
 		SELECT site_id as array_key, site_id FROM post_to_site
 			WHERE post_to_site.post_id = @result.post_id;	 
 	 
+		-- post_to_taxonomy_item
+		SELECT taxonomy_item_id as array_key, taxonomy_item_id FROM post_to_taxonomy_item
+			WHERE post_to_taxonomy_item.post_id = @result.post_id;	 
+	 
 	END
 
 	-- Add new post
 
 	CREATE PROCEDURE add(
 		IN post ARRAY,
-		IN site_id INT,
+		IN post_content ARRAY,
+		IN taxonomy_item_id ARRAY,
+		IN site_id ARRAY,
+		OUT insert_id,
+		OUT insert_id,
+		OUT insert_id,
 		OUT insert_id
 	)
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:post_data  = @FILTER(:post, post);
+		:post_data  = @FILTER(:post, post)
 		
 		
 		INSERT INTO post 
@@ -285,17 +305,17 @@
 			
 	  	VALUES ( :post_data );
 
-		:post.post_content  = @FILTER(:post.post_content, post_content, false, true);
+		:post_content  = @FILTER(:post_content, post_content, false, true)
 
 
-		@EACH(:post.post_content) 
+		@EACH(:post_content) 
 			INSERT INTO post_content 
 		
 				( @KEYS(:each), post_id)
 			
 			VALUES ( :each, @result.post);
 
-		@EACH(:post.taxonomy_item) 
+		@EACH(:taxonomy_item_id) 
 			INSERT INTO post_to_taxonomy_item 
 		
 				( `taxonomy_item_id`, post_id)
@@ -303,11 +323,12 @@
 			VALUES ( :each, @result.post)
 			ON CONFLICT(`post_id`,`taxonomy_item_id`) DO UPDATE SET `taxonomy_item_id` = :each;
 
+		@EACH(:site_id) 
 		INSERT INTO post_to_site 
 		
 			( `post_id`, `site_id` )
 			
-		VALUES ( @result.post, :site_id );			
+			VALUES ( @result.post, :each );		
 
 	END
 
@@ -315,15 +336,22 @@
 
 	CREATE PROCEDURE edit(
 		IN post ARRAY,
+		IN post_content ARRAY,
+		IN taxonomy_item_id ARRAY,
 		IN post_id INT,
-		IN site_id INT,
+		IN site_id ARRAY,
+		OUT insert_id,
+		OUT affected_rows,
+		OUT insert_id,
+		OUT affected_rows,
+		OUT insert_id,
 		OUT affected_rows
 	)
 	BEGIN
-		BEGIN TRANSACTION;
-		:post.post_content  = @FILTER(:post.post_content, post_content, false, true);
+	
+		:post_content  = @FILTER(:post_content, post_content, false, true)
 		
-		@EACH(:post.post_content) 
+		@EACH(:post_content) 
 			INSERT INTO post_content 
 		
 				( @KEYS(:each), post_id)
@@ -333,11 +361,12 @@
 			ON CONFLICT(post_id, language_id) DO UPDATE SET @LIST(:each);
 
 
-		-- @IF isset(:post.taxonomy_item) 
+		@IF isset(:taxonomy_item_id)
+		THEN
+			DELETE FROM post_to_taxonomy_item WHERE post_id = :post_id
+		END @IF;
 
-			-- DELETE FROM post_to_taxonomy_item WHERE post_id = :post_id;
-
-			@EACH(:post.taxonomy_item) 
+		@EACH(:taxonomy_item_id) 
 				INSERT INTO post_to_taxonomy_item 
 			
 					(taxonomy_item_id, post_id)
@@ -345,17 +374,21 @@
 				VALUES ( :each, :post_id)
 				ON CONFLICT(`post_id`,`taxonomy_item_id`) DO UPDATE SET `taxonomy_item_id` = :each;
 
-		-- END @IF
+		@IF isset(:site_id) 
+		THEN
+			DELETE FROM post_to_site WHERE post_id = :post_id
+		END @IF;
 
-		INSERT OR IGNORE INTO post_to_site 
+		@EACH(:site_id)
+		INSERT INTO post_to_site 
 		
 			( `post_id`, `site_id` )
 			
-		VALUES ( :post_id, :site_id );			
+		VALUES ( :post_id, :each );			
 
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:post, post);
+		@FILTER(:post, post)
 	
 		@IF !empty(:post) 
 		THEN
@@ -365,9 +398,8 @@
 				
 			WHERE post_id = :post_id
 		END @IF;
-		
 
-		COMMIT;
+
 	END
 	
 	-- Edit post content
@@ -380,7 +412,7 @@
 	)
 	BEGIN
 	
-		:post_content  = @FILTER(:post_content, post_content);
+		:post_content  = @FILTER(:post_content, post_content)
 	
 		UPDATE post_content 
 			
@@ -394,10 +426,9 @@
 
 	CREATE PROCEDURE delete(
 		IN  post_id ARRAY,
-		IN  site_id INT,
-		OUT affected_rows
-		OUT affected_rows
-		OUT affected_rows
+		OUT affected_rows,
+		OUT affected_rows,
+		OUT affected_rows,
 		OUT affected_rows
 	)
 	BEGIN

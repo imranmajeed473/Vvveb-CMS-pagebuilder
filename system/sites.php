@@ -62,7 +62,7 @@ class Sites {
 			self :: $sites = \Vvveb\config('sites');
 
 			foreach (self::$sites as &$site) {
-				$site['href'] = self :: url($site['host']);
+				$site['url'] = self :: url($site['host']);
 			}
 
 			return self :: $sites;
@@ -108,7 +108,11 @@ class Sites {
 		return 'default';
 	}
 
-	public static function setTheme($site, $theme) {
+	public static function setTheme($site, $theme, $template = '') {
+		if ($template) {
+			self :: setSiteData($site, 'template', $template);
+		}
+
 		return self :: setSiteData($site, 'theme', $theme);
 	}
 
@@ -128,8 +132,8 @@ class Sites {
 				return $matches;
 			}
 
-			//if host is ip number return the ip
-			if (is_numeric($host_matches['domain'] ?? null)) {
+			//if host is ip number, localhost or does not have tld remove tld and subdomain
+			if (is_numeric($host_matches['domain'] ?? null) || $host == 'localhost' || (strpos($host, '.') === false)) {
 				$matches['domain']    = $host;
 				$matches['subdomain'] = $matches['tld'] = $matches['prefix'] = '';
 			}
@@ -157,31 +161,30 @@ class Sites {
 				&& ! is_numeric($host_matches['domain'] ?? null)) {
 				self :: $host_matches[$host] = $host_matches;
 
-				$has_subdomain = ! empty($host_matches['subdomain']) || ($matches['subdomain'] != '*');
-				$has_tld       = ! empty($host_matches['tld']) || ($matches['tld'] != '*');
+				$subdomain = str_replace('*', $host_matches['subdomain'], $matches['subdomain']);
+				$domain    = str_replace('*', $host_matches['domain'], $matches['domain']);
+				$tld       = str_replace('*', $host_matches['tld'], $matches['tld']);
 
 				return $matches['prefix'] .
-					   str_replace('*', $host_matches['subdomain'], $matches['subdomain']) . ($has_subdomain ? '.' : '') .
-					   str_replace('*', $host_matches['domain'], $matches['domain']) . ($has_tld ? '.' : '') .
-					   str_replace('*', $host_matches['tld'], $matches['tld']) .
-					   ($matches['path'] ?? '');
+					   $subdomain . ($subdomain ? '.' : '') .
+					   $domain . ($tld ? '.' : '') . $tld .
+					   ($matches['path'] ?? '') .
+					   (V_SUBDIR_INSTALL ? V_SUBDIR_INSTALL : '');
 			}
 
-			//if host is ip number return the ip
-			if (is_numeric($host_matches['domain'] ?? null)) {
-				return $host;
-			}
-
-			if ($hostWp == 'localhost') {
+			//if host is ip number, localhost or does not have tld remove tld and subdomain
+			if (! ($matches['prefix'] || ($matches['tld'] && $matches['tld'] !== '*')) &&
+				(is_numeric($host_matches['domain'] ?? null) || $hostWp == 'localhost' || (strpos($hostWp, '.') === false))) {
 				$matches['domain']    = $host;
 				$matches['subdomain'] = $matches['tld'] = $matches['prefix'] = '';
 			}
 
-			return ($matches['prefix'] ? $matches['prefix'] : '') .
+			$url = ($matches['prefix'] ? $matches['prefix'] : '') .
 				   (! empty($matches['subdomain']) ? $matches['subdomain'] . '.' : '') .
 				   ($matches['domain'] ?? '') .
 				   (! empty($matches['tld']) ? '.' . $matches['tld'] : '') .
-				   ($matches['path'] ?? '');
+				   ($matches['path'] ?? '') .
+				   (V_SUBDIR_INSTALL ? V_SUBDIR_INSTALL : '');
 		}
 
 		return $url;
@@ -199,11 +202,11 @@ class Sites {
 
 			//key has changed replace site
 			if (isset($value['key']) && ($value['key'] != $site['key'])) {
-				$config = \Vvveb\get_config($key);
+				$config = \Vvveb\getConfig($key);
 
 				if ($config) {
 					$value += $config;
-					$config = \Vvveb\unset_config($key);
+					$config = \Vvveb\unsetConfig($key);
 					$key    = "sites.{$value['key']}";
 				}
 			}
@@ -212,14 +215,14 @@ class Sites {
 				$key .= ".$name";
 			}
 
-			return \Vvveb\set_config($key, $value);
+			return \Vvveb\setConfig($key, $value);
 		}
 
 		return false;
 	}
 
 	public static function setSiteDataByKey($site_key, $name, $value) {
-		$site = self :: getSiteByKey($site_id);
+		$site = self :: getSiteByKey($site_key);
 
 		$site_key = self :: siteKey($site_key);
 
@@ -230,7 +233,7 @@ class Sites {
 				$key .= ".$name";
 			}
 
-			return \Vvveb\set_config($key, $value);
+			return \Vvveb\setConfig($key, $value);
 		}
 
 		return false;
@@ -242,8 +245,6 @@ class Sites {
 		} else {
 			return self :: setSiteDataByKey($site, $name, $value);
 		}
-
-		return false;
 	}
 
 	public static function getHost() {
@@ -258,7 +259,7 @@ class Sites {
 		}
 
 		if (! $site_url) {
-			$host =$_SERVER['HTTP_HOST'] ?? 'localhost';
+			$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
 		}
 
 		$host = self :: siteKey($host);
@@ -294,11 +295,11 @@ class Sites {
 	public static function saveSite($site) {
 		$key = self :: siteKey(trim($site['key'] ?? $site['host']));
 		unset($site['key']);
-		$return = \Vvveb\set_config("sites.$key", $site);
+		$return = \Vvveb\setConfig("sites.$key", $site);
 	}
 
 	public static function deleteSite($site) {
 		$key    = self :: siteKey(trim($site['key'] ?? $site['host']));
-		$return = \Vvveb\unset_config("sites.$key", $site);
+		$return = \Vvveb\unsetConfig("sites.$key", $site);
 	}
 }

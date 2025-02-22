@@ -2,17 +2,73 @@ let bgVideoTemplate = '<video playsinline loop muted autoplay src="../../media/d
 let bgImageTemplate = '<img src="../../media/demo/sample.webp">';
 let defaultSeparatorSvg = '<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 41" width="100%" height="300" fill="var(--bs-body-bg)" preserveAspectRatio="none"><defs><style>.cls-1{fill:inherit}</style></defs><title>rough-edges-bottom</title><path class="cls-1" d="M0,185l125-26,33,17,58-12s54,19,55,19,50-11,50-11l56,6,60-8,63,15v15H0Z" transform="translate(0 -159)"/></svg>';
 
-let SectionBackground = [
-	{
+let section_sort = 1;
+
+let SectionContent = [{
+        name: "Title",
+        key: "title",
+        sort: section_sort++,
+        htmlAttr: "title",
+        inputtype: TextInput
+    },{
+        name: "Container width",
+        key: "container-width",
+        sort: section_sort++,
+		child:":scope > .container, :scope > .container-fluid",
+        htmlAttr: "class",
+        validValues: ["container", "container-fluid"],
+        inputtype: RadioButtonInput,
+        data: {
+            extraclass:"btn-group-sm btn-group-fullwidth",
+            options: [{
+				value: "container",
+				icon:"la la-box",
+				text: "Boxed",
+				title: "Boxed"
+			},{
+				value: "container-fluid",
+				icon:"la la-arrows-alt-h",
+				title: "Full",
+				text: "Full"
+            }]
+         }
+	},{
+        name: "Container height",
+        key: "container-height",
+        sort: section_sort++,
+        child:":scope > .container:first-child, :scope > .container-fluid:first-child",
+        htmlAttr: "class",
+        validValues: ["", "vh-100"],
+        inputtype: RadioButtonInput,
+        data: {
+				extraclass:"btn-group-sm btn-group-fullwidth",
+				options: [{
+				value: "container",
+				icon:"la la-expand",
+				text: "Auto",
+				title: "Auto",
+				checked:true,
+            },{
+				value: "vh-100",
+				icon:"la la-arrows-alt-v",
+				title: "Full",
+				text: "Full"
+            }]
+         }
+	}
+]; 	
+
+let SectionBackground = [{
         key: "section_background_header",
         inputtype: SectionInput,
         name:false,
-        sort: base_sort++,
-		//section: style_section,
+        sort: section_sort++,
+        //section: style_section,
         data: {header:"Background"},
    },{
         name: false,
         key: "section-bg",
+        sort: section_sort++,
         inputtype: RadioButtonInput,
         data: {
             inline: true,
@@ -22,22 +78,22 @@ let SectionBackground = [
                 text: "None",
                 title: "None",
                 checked:true,
-            }, {
+            },{
                 value: "bg-image",
                 icon:"la la-image",
                 text: "Image",
                 title: "Image",    
-			}, {/*  
+            },{/*  
                 value: "gradient",
                 icon:"la la-palette",
                 text: "Gradient",
                 title: "Gradient",
-			}, {*/
+            },{*/
                 value: "bg-video",
                 icon:"la la-video",
                 text: "Video",
                 title: "Video",/*
-			}, {
+            },{
                 value: "slideshow",
                 icon:"la la-arrows-alt-h",
                 text: "Slider",
@@ -45,39 +101,43 @@ let SectionBackground = [
             }],
         },
 		hideGroups : function() {
-			$('.mb-3[data-group="bg-image"],.mb-3[data-group="bg-video"]').hide();
+			document.querySelectorAll('.mb-3[data-group="bg-image"],.mb-3[data-group="bg-video"]').forEach(e => e.classList.add("d-none"));
 		},
 		
 		onChange : function(node, value, input) {
 			this.hideGroups();
-			$('.mb-3[data-group="'+ input.value + '"]').show();
+			document.querySelectorAll('.mb-3[data-group="'+ input.value + '"].d-none').forEach((el, i) => {
+				el.classList.remove("d-none");
+			});
 
-			let container = $("> .background-container", node);
-			if (!container.length) {
-				container = $('<div class="background-container"></div>');
-				node.append(container);
+			let container = node.querySelector(":scope > .background-container");
+			if (!container) {
+				container = generateElements('<div class="background-container"></div>')[0];
+				node.appendChild(container);
 			}
 			
-			let img = $("> .background-container > img", node);
-			let video = $("> .background-container > video", node);
+			let img = node.querySelector(":scope > .background-container > img");
+			let video = node.querySelector(":scope > .background-container > video");
 			
-			$("> *", container).addClass("d-none");
+			container.querySelectorAll(":scope > *").forEach((el, i) => {
+				el.classList.add("d-none");
+			});
 			
 			switch (value) {
 				case "bg-image":
-					if (img.length) {
-						img.removeClass("d-none");
+					if (img) {
+						img.classList.remove("d-none");
 					} else {
-						container.append(bgImageTemplate);
+						container.append(generateElements(bgImageTemplate)[0]);
 						//reselect element to load image
 						node.click();
 					}
 				break;
 				case "bg-video":
-					if (video.length) {
-						video.removeClass("d-none");
+					if (video) {
+						video.classList.remove("d-none");
 					} else {
-						container.append(bgVideoTemplate);
+						container.append(generateElements(bgVideoTemplate)[0]);
 						//reselect element to load video
 						node.click();
 					}
@@ -89,24 +149,25 @@ let SectionBackground = [
 		}, 
 		init: function(node) {
 			let selected = "none";
-			let img = $("> .background-container img:visible", node);
-			let video = $("> .background-container video:visible", node);
+			let img = node.querySelector(":scope > .background-container img");
+			let video = node.querySelector(":scope > .background-container video");
 			
-			if (img.length) {
+			if (img?.offsetParent) {
 				selected = "bg-image";
 			}
-			if (video.length) {
+			if (video?.offsetParent) {
 				selected = "bg-video";
 			}
 			
 			this.hideGroups();
 			return selected;
 		},            
-    }, {
+    },{
         name: "Image",
         key: "src",
+        sort: section_sort++,
         htmlAttr: "src",
-		child:"> .background-container > img",
+		child:":scope > .background-container > img",
 		group:"bg-image",
 		inline:true,
         inputtype: ImageInput
@@ -114,16 +175,18 @@ let SectionBackground = [
         name: "Video",
         child: "source",
         key: "src",
+        sort: section_sort++,
         htmlAttr: "src",
-		child:"> .background-container > video",
+		child:":scope > .background-container > video",
 		group:"bg-video",
 		inline:true,
         inputtype: VideoInput
-   }, {
+   },{
         name: "Poster",
         key: "poster",
+        sort: section_sort++,
         htmlAttr: "poster",
-		child:"> .background-container > video",
+		child:":scope > .background-container > video",
 		group:"bg-video",
 		inline:true,
         inputtype: ImageInput
@@ -131,18 +194,18 @@ let SectionBackground = [
 ];
 
 
-let SectionOverlay = [
-	{
+let SectionOverlay = [{
         key: "section_overlay",
         inputtype: SectionInput,
         name:false,
-        sort: base_sort++,
-		//section: style_section,
+        sort: section_sort++,
+        //section: style_section,
         data: {header:"Overlay"},
 	},{
         //name: "Enable",
 		name: false,
         key: "overlay",
+        sort: section_sort++,
         inline: true,
         //validValues: ["", "active"],
         inputtype: ToggleInput,
@@ -152,52 +215,53 @@ let SectionOverlay = [
             off: 'false'
         },
 		onChange : function(node, value, input) {
-			let group = $('.mb-3[data-group="overlay"]');
-			let overlay = $("> .overlay", node);
+			let group = document.querySelectorAll('.mb-3[data-group="overlay"]');
+			let overlay = node.querySelector(":scope > .overlay");
 			
 			if (value == 'true') {
-				group.show();
+				group.forEach(e => e.classList.remove("d-none"));
 				
-				if (!overlay.length) {
-					overlay = $('<div class="overlay"></div>');
-					node.append(overlay);
+				if (!overlay) {
+					overlay = generateElements('<div class="overlay"></div>')[0];
+					node.appendChild(overlay);
 				} else {
-					overlay.removeClass("d-none");
+					overlay.classList.remove("d-none");
 				}
 			} else {
-				group.hide();
-				overlay.addClass("d-none");
+				group.forEach(e => e.classList.add("d-none"));
+				if (overlay) overlay.classList.add("d-none");
 			}
 
 			return element;
 		}, 
 		init: function(node) {
-			let overlay = $("> .overlay:visible", node);
-			let group = $('.mb-3[data-group="overlay"]');
-			
-			if (overlay.length) {
-				group.show();
-				console.log(group);
+			let overlay = node.querySelector(":scope > .overlay");
+			let group = document.querySelectorAll('.mb-3[data-group="overlay"]');
+
+			if (overlay && overlay.offsetParent) {
+				group.forEach(e => e.classList.remove("d-none"));
 				return 'true';
 			} else {
-				group.hide();
+				group.forEach(e => e.classList.add("d-none"));
 				return 'false';
 			}
 		}		
     },{
         name: "Color",
         key: "background-color",
+        sort: section_sort++,
         htmlAttr: "style",
-		child:"> .overlay",
+		child:":scope > .overlay",
 		group:"overlay",
         inputtype: ColorInput
-   }, {
+   },{
         name: "Opacity",
         key: "opacity",
+        sort: section_sort++,
 		htmlAttr: "style",
 		inline:false,
 		group:"overlay",
-		child:"> .overlay",
+		child:":scope > .overlay",
         inputtype: RangeInput,
         data:{
 			max: 1, //max zoom level
@@ -211,13 +275,14 @@ function sectionSeparatorProperties(name, title) {
         key: `section_${name}_separator`,
         inputtype: SectionInput,
         name:false,
-        sort: base_sort++,
-		//section: style_section,
+        sort: section_sort++,
+        //section: style_section,
         data: {header:`${title} Separator`},
 	},{
         //name: "Enable",
 		name: false,
         key: `${name}_separator`,
+        sort: section_sort++,
         inline: true,
         inputtype: ToggleInput,
         data: {
@@ -226,56 +291,57 @@ function sectionSeparatorProperties(name, title) {
             off: 'false'
         },
 		onChange : function(node, value, input) {
-			let group = $(`[data-group="${name}_separator"]`);
-			let separator = $(`> .${name}.separator`, node);
-			
+			let group = document.querySelectorAll(`[data-group="${name}_separator"]`);
+			let separator = node.querySelector(`:scope > .${name}.separator`);
+
 			if (value == 'true') {
-				group.show();
+				group.forEach(e => e.classList.remove("d-none"));
 				
-				if (!separator.length) {
-					separator = $(`<div class="separator ${name}">${defaultSeparatorSvg}</div>`);
-					node.append(separator);
+				if (!separator) {
+					separator = generateElements(`<div class="separator ${name}">${defaultSeparatorSvg}</div>`)[0];
+					node.appendChild(separator);
 				} else {
-					separator.removeClass("d-none");
+					separator.classList.remove("d-none");
 				}
 			} else {
-				group.hide();
-				separator.addClass("d-none");
+				group.forEach(e => e.classList.add("d-none"));
+				separator.classList.add("d-none");
 			}
 
 			return element;
 		}, 
 		init: function(node) {
-			let separator = $(`> .${name}.separator:visible`, node);
-			let group = $(`[data-group="${name}_separator"]`);
+			let group = node.querySelectorAll(`[data-group="${name}_separator"]`);
+			let separator = node.querySelector(`:scope > .${name}.separator`);
 			
-			if (separator.length) {
-				group.show();
-				console.log(group);
+			if (separator && separator.offsetParent) {
+				group.forEach(e => e.classList.remove("d-none"));
 				return 'true';
 			} else {
-				group.hide();
+				group.forEach(e => e.classList.add("d-none"));
 				return 'false';
 			}
 		}		
     },{
 		name: "Icon",
 		key: "icon",
+		sort: section_sort++,
 		inline:true,
 		group:`${name}_separator`,
 		child:`.separator.${name} > svg`,
 		inputtype: HtmlListSelectInput,
 		onChange:function(element, value, input, component) {
-			console.log(element);
-			var newElement = $(value);
-			let attributes = element.prop("attributes");
+			let newElement = generateElements(value)[0];
+			let attributes = element.attributes;
 			
 			//keep old svg size and colors
-			$.each(attributes, function() {
-				if (this.name == "viewBox") return;
-                newElement.attr(this.name, this.value);
-            });
-            
+			for (let i = 0; i < attributes.length; i++) {
+				let attr = attributes[i];
+				if (attr.name && attr.name != "viewBox") {
+					newElement.setAttribute(attr.name, attr.value);
+				}
+			}
+			
 			element.replaceWith(newElement);
 			return newElement;
 		},
@@ -289,9 +355,10 @@ function sectionSeparatorProperties(name, title) {
                 text: "Red panther"
             }]
 		},
-	}, {
+	},{
 		name: "Width",
 		key: "width",
+		sort: section_sort++,
 		htmlAttr: "width",
 		group:`${name}_separator`,
 		child:`.separator.${name} > svg`,
@@ -301,9 +368,10 @@ function sectionSeparatorProperties(name, title) {
 			min:6,
 			step:1
 		}
-   }, {
+   },{
 		name: "Height",
 		key: "height",
+		sort: section_sort++,
 		htmlAttr: "height",
 		group:`${name}_separator`,
 		child:`.separator.${name} > svg`,
@@ -313,9 +381,10 @@ function sectionSeparatorProperties(name, title) {
 			min:6,
 			step:1
 		}			
-   }, {
+   },{
 		name: "Stroke width",
 		key: "stroke-width",
+		sort: section_sort++,
 		htmlAttr: "stroke-width",
 		group:`${name}_separator`,
 		child:`.separator.${name} > svg`,
@@ -330,16 +399,16 @@ function sectionSeparatorProperties(name, title) {
 		inputtype: SectionInput,
 		name:false,
 		group:`${name}_separator`,
-		//sort: base_sort++,
-		//section: style_section,
+		sort: section_sort++,
+        //section: style_section,
 		data: {header:"Svg colors"},
 	},*/ {
         name: "Fill Color",
         key: "fill",
-        //sort: base_sort++,
+        sort: section_sort++,
         col:4,
         inline:true,
-		//section: style_section,
+        //section: style_section,
 		group:`${name}_separator`,
 		child:`.separator.${name} > svg`,
 		htmlAttr: "fill",
@@ -347,21 +416,21 @@ function sectionSeparatorProperties(name, title) {
    },{
         name: "Color",
         key: "color",
-        //sort: base_sort++,
+        sort: section_sort++,
         col:4,
         inline:true,
-		//section: style_section,
-		group:`${name}_separator`,
-		child:`.separator.${name} > svg`,
-		htmlAttr: "color",
+        //section: style_section,
+	group:`${name}_separator`,
+	child:`.separator.${name} > svg`,
+	htmlAttr: "color",
         inputtype: ColorInput,
    },{
         name: "Stroke",
         key: "stroke",
-        //sort: base_sort++,
+        sort: section_sort++,
         col:4,
         inline:true,
-		//section: style_section,
+        //section: style_section,
 		group:`${name}_separator`,
 		child:`.separator.${name} > svg`,
 		htmlAttr: "color",
@@ -370,18 +439,18 @@ function sectionSeparatorProperties(name, title) {
 ];
 }
 
-let SectionBottomSeparator = [
-	{
+let SectionBottomSeparator = [{
         key: "section_bottom_separator",
         inputtype: SectionInput,
         name:false,
-        sort: base_sort++,
-		//section: style_section,
+        sort: section_sort++,
+        //section: style_section,
         data: {header:"Bottom Separator"},
 	},{
         //name: "Enable",
 		name: false,
         key: "top_bottom",
+        sort: section_sort++,
         inline: true,
         validValues: ["", "active"],
         inputtype: ToggleInput,
@@ -392,59 +461,10 @@ let SectionBottomSeparator = [
         }
 	}, 
 ];
-
+	
 /* Section */
-let ComponentSectionContent = [{
-        name: "Title",
-        key: "title",
-        htmlAttr: "title",
-        inputtype: TextInput
-    }, {
-        name: "Container width",
-        key: "container-width",
-		child:"> .container, > .container-fluid",
-        htmlAttr: "class",
-        validValues: ["container", "container-fluid"],
-        inputtype: RadioButtonInput,
-        data: {
-			extraclass:"btn-group-sm btn-group-fullwidth",
-            options: [{
-				value: "container",
-				icon:"la la-box",
-				text: "Boxed",
-				title: "Boxed"
-			}, 
-			{
-				value: "container-fluid",
-				icon:"la la-arrows-alt-h",
-				title: "Full",
-				text: "Full"
-			}]
-        }
-	}, {
-        name: "Container height",
-        key: "container-height",
-		child:"> .container:first-child, > .container-fluid:first-child",
-        htmlAttr: "class",
-        validValues: ["", "vh-100"],
-        inputtype: RadioButtonInput,
-        data: {
-			extraclass:"btn-group-sm btn-group-fullwidth",
-            options: [{
-				value: "container",
-				icon:"la la-expand",
-				text: "Auto",
-				title: "Auto",
-				checked:true,
-			}, 
-			{
-				value: "vh-100",
-				icon:"la la-arrows-alt-v",
-				title: "Full",
-				text: "Full"
-			}]
-        }
-	}, 
+let ComponentSectionContent = [
+	...SectionContent,
 	...SectionBackground,
 	...SectionOverlay,
 	...sectionSeparatorProperties("top", "Top"),
@@ -453,41 +473,40 @@ let ComponentSectionContent = [{
    
 
 let ComponentSectionStyle = [];/*[{
-		key: "Section Style",
-		inputtype: SectionInput,
-		name:false,
-		section: style_section,
-		data: {header:"Style"},
- 
-	},{
+        key: "Section Style",
+        inputtype: SectionInput,
+        name:false,
+        //section: style_section,
+        data: {header:"Style"},
+    },{
         name: "Text1 Style",
         key: "text1",
         htmlAttr: "innerHTML",
         inputtype: TextInput,
-        section: style_section,
-    }, {
+        //section: style_section,
+    },{
         name: "Name1 Style",
         key: "name1",
         htmlAttr: "name",
         inputtype: TextInput,
-        section: style_section,
-    }, {
+        //section: style_section,
+    },{
         name: "Type1 Style",
         key: "type1",
 		htmlAttr: "type",
         inputtype: SelectInput,
-        section: style_section,
+        //section: style_section,
         data: {
-			options: [{
-				value: "button",
-				text: "button"
-			}, {	
-				value: "reset",
-				text: "reset"
-			}, {
-				value: "submit",
-				text: "submit"
-			}],
+		options: [{
+			value: "button",
+			text: "button"
+		},{	
+			value: "reset",
+			text: "reset"
+		},{
+			value: "submit",
+			text: "submit"
+		}],
 		}
    	},{
         name: "Autofocus1 Style",
@@ -496,7 +515,7 @@ let ComponentSectionStyle = [];/*[{
         inputtype: CheckboxInput,
 		inline:true,
         col:6,
-        section: style_section
+        //section: style_section
    	},{
         name: "Disabled1 Style",
         key: "disabled1",
@@ -504,47 +523,46 @@ let ComponentSectionStyle = [];/*[{
         inputtype: CheckboxInput,		
 		inline:true,
         col:6,
-        section: style_section,
+        //section: style_section,
 }];*/
 
 let ComponentSectionAdvanced = [];/* [{
-		key: "Section Advanced",
-		inputtype: SectionInput,
-		name:false,
-		section: advanced_section,
-		data: {header:"Advanced"},
- 
-	},{
+	key: "Section Advanced",
+	inputtype: SectionInput,
+	name:false,
+	section: advanced_section,
+	data: {header:"Advanced"},
+    },{
         name: "Text1 Advanced",
         key: "text1",
         htmlAttr: "innerHTML",
         inputtype: TextInput,
         section: advanced_section,
-    }, {
+    },{
         name: "Name1 Advanced",
         key: "name1",
         htmlAttr: "name",
         inputtype: TextInput,
         section: advanced_section,
-    }, {
+    },{
         name: "Type1 Advanced",
         key: "type1",
 		htmlAttr: "type",
         inputtype: SelectInput,
         section: advanced_section,
         data: {
-			options: [{
-				value: "button",
-				text: "button"
-			}, {	
-				value: "reset",
-				text: "reset"
-			}, {
-				value: "submit",
-				text: "submit"
-			}],
-		}
-   	},{
+		options: [{
+			value: "button",
+			text: "button"
+		},{	
+			value: "reset",
+			text: "reset"
+		},{
+			value: "submit",
+			text: "submit"
+		}],
+	}
+    },{
         name: "Autofocus1 Advanced",
         key: "autofocus1",
         htmlAttr: "autofocus",
@@ -552,7 +570,7 @@ let ComponentSectionAdvanced = [];/* [{
 		inline:true,
         col:6,
         section: advanced_section
-   	},{
+    },{
         name: "Disabled1 Advanced",
         key: "disabled1",
         htmlAttr: "disabled",
@@ -564,37 +582,46 @@ let ComponentSectionAdvanced = [];/* [{
 
 function componentsInit(node) {
 		
-		$('.mb-3[data-group]').hide();
+		document.querySelectorAll('.mb-3[data-group]').forEach(e => e.classList.add("d-none"));
 
-		let img = $("> .background-container img:visible", node);
-		let video = $("> .background-container video:visible", node);
+		let img = node.querySelector(":scope > .background-container img");
+		let video = node.querySelector(":scope > .background-container video");
+		let overlay = node.querySelector(":scope > .overlay");
+		let separatorTop = node.querySelector(":scope > .separator.top");
+		let separatorBottom = node.querySelector(":scope > .separator.bottom");
 		let bg = "";
 		
-		if (img.length) {
+		if (img && img.offsetParent) {
 			bg = "bg-image";
 		}
-		if (video.length) {
+		
+		if (video && video.offsetParent) {
 			bg = "bg-video";
 		}
 		
-		if (bg) {
-			$('.mb-3[data-group="' + bg + '"]').show();
+		let showSection = function (section) {
+			document.querySelectorAll('.mb-3[data-group="' + section + '"]').forEach(e => e.classList.remove("d-none"));
 		}
 		
-		if ($("> .overlay:visible", node).length) {
-			$('.mb-3[data-group="overlay"]').show();
+		if (bg) {
+			showSection(bg);
+		}
+		
+		if (overlay && overlay.offsetParent) {
+			showSection("overlay");
 		}		
 		
-		if ($("> .separator.top:visible", node).length) {
-			$('.mb-3[data-group="top_separator"]').show();
+		if (separatorTop && separatorTop.offsetParent) {
+			showSection("top_separator");
 		}
 		
-		if ($("> .separator.bottom:visible", node).length) {
-			$('.mb-3[data-group="bottom_separator"]').show();
+		if (separatorBottom && separatorBottom.offsetParent) {
+			showSection("bottom_separator");
 		}
 }
 
-Vvveb.Components.add("elements/section", {
+//Vvveb.Components.add("elements/section", {
+Vvveb.Components.extend("_base", "elements/section", {
     nodes: ["section"],
     name: "Section",
     image: "icons/stream-solid.svg",
@@ -611,7 +638,8 @@ Vvveb.Components.add("elements/section", {
 	init: componentsInit	
 });  
 
-Vvveb.Components.add("elements/header", {
+//Vvveb.Components.add("elements/header", {
+Vvveb.Components.extend("_base", "elements/header", {
     nodes: ["header"],
     name: "Header",
     image: "icons/stream-solid.svg",
@@ -628,8 +656,8 @@ Vvveb.Components.add("elements/header", {
     init: componentsInit	
 });  
 
-
-Vvveb.Components.add("elements/footer", {
+//Vvveb.Components.add("elements/footer", {
+Vvveb.Components.extend("_base", "elements/footer", {
     nodes: ["footer"],
     name: "Footer",
     image: "icons/stream-solid.svg",

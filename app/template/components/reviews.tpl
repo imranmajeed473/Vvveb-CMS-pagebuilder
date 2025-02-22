@@ -27,12 +27,12 @@ if($reviews && is_array($reviews)) {
 		
 		@review|data-review_id = $review['review_id']
 		
-		@review|addClass = <?php echo 'level-' . ($review['level'] ?? 0);?>
+		@review|addClass = <?php if (!$vvveb_is_page_edit) echo 'level-' . ($review['level'] ?? 0);?>
 		
-		@review|id = <?php echo 'review-' . $review['product_review_id'];?>
+		@review|id = <?php if (!$vvveb_is_page_edit) echo 'review-' . $review['product_review_id'];?>
 		
-		@review [data-v-review-content] = <?php echo $review['content'];?>
-		@review img[data-v-review-avatar]|width = <?php echo $review['size'] ?? '60';?>
+		@review [data-v-review-content] = $review['content']
+		@review img[data-v-review-avatar]|width = <?php echo (int)($review['size'] ?? 60);?>
 		
 		@review img[data-v-review-*]|src = $review['@@__data-v-review-(*)__@@']
 		

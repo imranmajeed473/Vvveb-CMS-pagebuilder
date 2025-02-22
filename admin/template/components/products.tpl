@@ -15,14 +15,14 @@ $_pagination_count = $count;
 $_pagination_limit = $products['limit'] ?? 5;
 ?>
 
-[data-v-component-products] [data-v-category] = <?php $_category = current($products['products']);echo $_category['category'];?>
-[data-v-component-products] [data-v-manufacturer] = <?php $_manufacturer = current($products['products']);echo $_manufacturer['manufacturer'];?>
+[data-v-component-products] [data-v-category]     = <?php $_category     = current($products['products']); echo htmlspecialchars($_category['category']);?>
+[data-v-component-products] [data-v-manufacturer] = <?php $_manufacturer = current($products['products']); echo htmlspecialchars($_manufacturer['manufacturer']);?>
 
 
 [data-v-component-products]  [data-v-product]|before = <?php
-if(is_array($products['products']))  {
+if(is_array($products['product']))  {
 	$index = 0;
-	foreach ($products['products'] as $index => $product) { ?>
+	foreach ($products['product'] as $index => $product) { ?>
 
 	@product [data-v-product-image]|src = $product['image']
 	@product [data-v-product-image-url] = $product['image']
@@ -34,10 +34,10 @@ if(is_array($products['products']))  {
 	@product [data-v-product-content] = <?php echo $product['content'];?>
 	
     
-	@product [data-v-product-cart-url]|href = <?php echo htmlentities(Vvveb\url('checkout/cart' ,$product));?>
+	@product [data-v-product-cart-url]|href = <?php echo htmlspecialchars(Vvveb\url('checkout/cart' ,$product));?>
 	@product [data-v-product-cart-url]|data-v-product_id = $product['product_id']
 	
-	@product [data-v-product-url]|href =<?php echo htmlentities(Vvveb\url('product/product/index', $product));?>
+	@product [data-v-product-url]|href  = <?php echo htmlspecialchars(Vvveb\url('product/product/index', $product));?>
 	@product [data-v-product-url]|title = $product['title']	
 	
 	@product|after = <?php 

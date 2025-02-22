@@ -21,66 +21,89 @@
 if (VvvebTheme === undefined) var VvvebTheme = {};
 
 VvvebTheme.Ajax = {
-	call: function(parameters, element, selector, callback) {
-		let url = '/index.php?module=' +  parameters["module"] + '&action=' + parameters["action"];
+	call: function(url, parameters, element, selector, callback, requestType = "POST") {
+		if (!url) {
+			url = '/index.php?module=' +  parameters["module"] + '&action=' + parameters["action"];
+		} 
+		
 		if (!selector) {
 			url += '&_component_ajax=' + parameters["component"] + '&_component_id=' + parameters["component_id"];
 		}
-		$.ajax({
-			url,
-			type: 'post',
-			data: parameters,
-			//dataType: 'json',
-			beforeSend: function() {
-				let loading = $('.loading', element);
-				let btn = $('.button-text', element);
-				
-				if (loading.hasClass("d-none")) {
-					loading.removeClass('d-none');
-					btn.addClass('d-none');
-				}
-				
-				if ($(element).is('button'))  {
-					$(element).attr("disabled", "true");
-				}
-			},
-			complete: function() {
-				let loading = $('.loading', element);
-				let btn = $('.button-text', element);
-				
-				if (btn.hasClass("d-none")) {
-					loading.addClass('d-none');
-					btn.removeClass('d-none');
-				}
-				
-				if ($(element).is('button')) {
-					$(element).removeAttr("disabled");
-				}
-				//$('#cart > button').button('reset');
-			},
-			success: function(data) {
-				//$("header [data-v-component-cart]")[0].outerHTML = data;
-				if (selector) {
-					let response = $(data);//new DOMParser().parseFromString(data, "text/html");
-					if (Array.isArray (selector) ) {
-						for (k in selector) {
-							let elementSelector = selector[k];
-							let element = $(elementSelector, response);
-							if (element.length) {
-								$(elementSelector).replaceWith($(elementSelector, response));
-							}
-						}
-					} else {
-						$(selector).replaceWith($(selector, response));
-					}
-				}
-				if (callback) callback(data);
-			},
-			error: function(xhr, ajaxOptions, thrownError) {
-				alert(thrownError + "\r\n" + xhr.statusText + "\r\n" + xhr.responseText);
-			}
-		});		
+	
+		let loading = element?.querySelector('.loading');
+		let btn = element?.querySelector('.button-text');
 		
+		if (loading && loading.classList.contains("d-none")) {
+			loading.classList.remove('d-none');
+			btn.classList.add('d-none');
+		}
+		
+		if (element?.hasAttribute("button"))  {
+			element.setAttribute("disabled", "true");
+		}
+	
+		const controller = new AbortController();
+		const signal = controller.signal;
+		
+		 fetch(url, {
+			method: requestType,   
+			headers: {
+			"X-Requested-With": "XMLHttpRequest",
+		  },
+		  signal: signal,
+		  body: new URLSearchParams(parameters)})
+		 .then(response => {
+			if (!response.ok) { throw new Error(response) }
+			if (response.redirected) { 
+				controller.abort();
+				window.location.href = response.url; 
+			}
+			
+			return response.text()
+		 })
+		.then(data => {
+			if (selector) {
+				let response = new DOMParser().parseFromString(data, "text/html");
+				if (!Array.isArray (selector) ) {
+					selector = [selector];
+				}
+				
+				for (k in selector) {
+					let elementSelector = selector[k];
+					let currentElements = document.querySelectorAll(elementSelector);
+					let newElements = response.querySelectorAll(elementSelector);
+					
+					if (currentElements && newElements) {
+						currentElements.forEach( (e, i) => {e.replaceWith(newElements[i])});
+					} /*if (currentElements) {
+						currentElements.forEach(e => e.remove());
+					} else if (newElements) {
+						//new elements don't  have corresponding elements on the page, reload hole page
+						response = new DOMParser().parseFromString(data, "text/html")
+						document.querySelector("body").replaceWith(response.querySelector("body"));
+						break;
+					}*/
+				}
+			}
+
+			if (callback) callback(data);
+			
+			let loading = element?.querySelector('.loading');
+			let btn = element?.querySelector('.button-text');
+			
+			if (loading && btn.classList.contains("d-none")) {
+				loading.classList.add('d-none');
+				btn.classList.remove('d-none');
+			}
+			
+			if (element.hasAttribute("button")) {
+				element.removeAttribute("disabled");
+			}
+		})
+		.catch(error => {
+			console.log(error);
+			//displayToast("bg-danger", "Revision", "Error!");
+		});				
 	}
 }
 
@@ -95,13 +118,13 @@ VvvebTheme.Cart = {
 		parameters['action']       = parameters['action']?? action;
 		parameters['component']    = parameters['component'] ?? this.component;
 		parameters['component_id'] = parameters['component_id'] ?? this.component_id;
-		VvvebTheme.Ajax.call(parameters, element,  selector, callback);
+		VvvebTheme.Ajax.call("", parameters, element,  selector, callback);
 	},
 	
 	callback: function(data) {
 		/*
-			let miniCart = $("[data-v-component-cart]");
-			if (miniCart.length) {
+			let miniCart = document.querySelectorAll("[data-v-component-cart]");
+			if (miniCart) {
 				miniCart[0].outerHTML = data;
 			}*/
 	},
@@ -144,7 +167,7 @@ VvvebTheme.Cart = {
 
 VvvebTheme.Wishlist = {
 	
-	module: 'cart/wishlist',
+	module: 'user/wishlist',
 	component: 'wishlist',
 	component_id: '0',
 	
@@ -153,25 +176,54 @@ VvvebTheme.Wishlist = {
 		parameters['action'] = action;
 		parameters['component'] = this.component;
 		parameters['component_id'] = this.component_id;
-		VvvebTheme.Ajax.call(parameters, element,  selector, callback);
+		VvvebTheme.Ajax.call("", parameters, element,  selector, callback);
 	},
 	
 	callback: function(data) {
-		/*
-			let miniWishlist = $("[data-v-component-wishlist]");
-			if (miniWishlist.length) {
-				miniWishlist[0].outerHTML = data;
-			}*/
 	},
 	
-	add: function(productId, quantity, element,  selector, callback = false) {
+	add: function(productId, element,  selector, callback = false) {
 		if (!callback) callback = this.callback;
-		return this.ajax('add',{'product_id':productId, 'quantity':quantity}, element, selector, callback);
+		return this.ajax('add',{'product_id':productId}, element, selector, callback);
 	},
 	
 	update: function(productId, quantity, element,  selector, callback = false) {
 		if (!callback) callback = this.callback;
-		return this.ajax('update',{'product_id':productId, 'quantity':quantity}, element, selector, callback);
+		return this.ajax('update',{'product_id':productId}, element, selector, callback);
+	},
+ 
+	remove: function(productId, element, selector, callback = false) {
+		if (!callback) callback = this.callback;
+		return this.ajax('remove', {'product_id':productId}, element, selector, callback);
+	}
+
+}
+
+VvvebTheme.Compare = {
+	
+	module: 'cart/compare',
+	component: 'compare',
+	component_id: '0',
+	
+	ajax: function(action, parameters, element, selector, callback) {
+		parameters['module'] = this.module;
+		parameters['action'] = action;
+		parameters['component'] = this.component;
+		parameters['component_id'] = this.component_id;
+		VvvebTheme.Ajax.call("", parameters, element,  selector, callback);
+	},
+	
+	callback: function(data) {
+	},
+	
+	add: function(productId, element,  selector, callback = false) {
+		if (!callback) callback = this.callback;
+		return this.ajax('add',{'product_id':productId}, element, selector, callback);
+	},
+	
+	update: function(productId, quantity, element,  selector, callback = false) {
+		if (!callback) callback = this.callback;
+		return this.ajax('update',{'product_id':productId}, element, selector, callback);
 	},
  
 	remove: function(productId, element, selector, callback = false) {
@@ -188,7 +240,7 @@ VvvebTheme.Comments = {
 	ajax: function(action, parameters, element,  selector, callback = false) {
 		parameters['module'] = parameters['module'] ?? this.module;
 		parameters['action'] = parameters['action'] ?? action;
-		VvvebTheme.Ajax.call(parameters, element, selector, callback);
+		VvvebTheme.Ajax.call("", parameters, element, selector, callback);
 	},
 	
 	add: function(parameters, element,  selector, callback = false) {
@@ -216,7 +268,7 @@ VvvebTheme.User = {
 		parameters['component'] = parameters['component'] ?? this.component;
 		parameters['component_id'] = parameters['component_id'] ?? this.component_id;
 		
-		VvvebTheme.Ajax.call(parameters, element, selector, callback);
+		VvvebTheme.Ajax.call("", parameters, element, selector, callback);
 	},
 	
 	login: function(parameters, element, selector, callback = false) {
@@ -236,7 +288,7 @@ VvvebTheme.Search = {
 		parameters['component'] = parameters['component'] ?? this.component;
 		parameters['component_id'] = parameters['component_id'] ?? this.component_id;
 		
-		VvvebTheme.Ajax.call(parameters, element, selector, callback = false);
+		VvvebTheme.Ajax.call("/search", parameters, element, selector, callback = false);
 	},
 	
 	query: function(parameters, element, selector, callback) {
@@ -247,89 +299,123 @@ VvvebTheme.Search = {
 VvvebTheme.Alert  = {
 	
 	show: function(message) {
-		$('.alert-top .message').html(message);
-		$('.alert-top').addClass("show").css('display', 'block');
+		let alertTop = document.querySelector('.alert-top');
+		alertTop.querySelector(".message").innerHTML = message;
+		alertTop.classList.add("show");
+		alertTop.style.display = "block";
 		
 		setTimeout(function () {
-			$('.alert-top').fadeOut();
+			alertTop.style.display = "none";
 		}, 4000);
 	}
 }
 
-$('.alert-top').on('close.bs.alert', function (e) {
+document.querySelector('.alert-top .btn-close')?.addEventListener('click', function (e) {
+    let alert = this.closest(".alert");
+    alert.classList.remove('show')
+    alert.style.display = "";
     e.preventDefault();
-    $(this).removeClass('show').css('display', 'none');
 });
 
 function objectSerialize(serializeArray) {
-    var returnObject = {};
-    for (var i = 0; i < serializeArray.length; i++){
+    let returnObject = {};
+    for (let i = 0; i < serializeArray.length; i++){
         returnObject[serializeArray[i]['name']] = serializeArray[i]['value'];
     }
     return returnObject;
+}
+
+
+function elementProduct(element) {
+	let product = element.closest("[data-v-product]");
+	if (!product) {
+		product = element.closest("[data-v-component-product]");
+	}
+	if (!product) {
+		product = element.closest("[data-v-cart-product]");
+	}	
+	
+	return product;
 }
 
 VvvebTheme.Gui = {
 	
 	init: function() {
 		let events = [];
-		
-		$("[data-v-vvveb-action]").each(function () {
+	
+		document.querySelectorAll("[data-v-vvveb-action]").forEach(function (el) {
 
 			let on = "click";
-			if (this.dataset.vVvvebOn) on = this.dataset.vVvvebOn;
-			let event = '[data-v-vvveb-action="' + this.dataset.vVvvebAction + '"]';
+			if (el.dataset.vVvvebOn) on = el.dataset.vVvvebOn;
+			
+			if (events.indexOf(on) > -1) return;
+			events.push(on);
+			
+			document.addEventListener(on, function (e) {
+				let element = e.target.closest("[data-v-vvveb-action]");
+				if (element) {
+					let action = element.dataset.vVvvebAction;
+					let elOn = element.dataset.vVvvebOn ?? "click";
+					
+					if (elOn == on && VvvebTheme.Gui.hasOwnProperty(action)) {
+						VvvebTheme.Gui[action].call(e.target, e);
+					}
+				}
+			});
+		});
+		
+		/*
+		document.querySelectorAll("[data-v-vvveb-action]").forEach(function (el) {
+
+			let on = "click";
+			if (el.dataset.vVvvebOn) on = el.dataset.vVvvebOn;
+			let event = '[data-v-vvveb-action="' + el.dataset.vVvvebAction + '"]';
 
 			if (events.indexOf(event + on) > -1) return;
 			events.push(event + on);
 			
-			if (VvvebTheme.Gui.hasOwnProperty(this.dataset.vVvvebAction)) {
-				$(document).on(on, event, VvvebTheme.Gui[this.dataset.vVvvebAction]);
+			if (VvvebTheme.Gui.hasOwnProperty(el.dataset.vVvvebAction)) {
+				document.addEventListener(on, function (e) {
+					let element = e.target.closest("[data-v-vvveb-action]");
+					if (element) {
+						VvvebTheme.Gui[el.dataset.vVvvebAction].call(e.target, e);
+					}
+				});
+				//document).addEventListener(on, VvvebTheme.Gui[this.dataset.vVvvebAction]);
 			}
 		});
-
-		/*
-		for (actionName in VvvebTheme.Gui)
-		{
-			if (actionName == "init") continue;
-			//console.log(actionName);
-			$(document).on("click", '[data-v-vvveb-action="' + actionName + '"]', VvvebTheme.Gui[actionName]);
-		}*/
+		*/
 	},
 	
-	addToCart : function (e) {
-		let product = $(this).parents("[data-v-product]");
-		if (!product.length) {
-			product = $(this).parents("[data-v-component-product]");
-		}
-		if (!product.length) {
-			product = $(this).parents("[data-v-cart-product]");
-		}
+	addToCart: function(e) {
+		let product = elementProduct(this);
 		
-		let img = $("img[data-v-product-image], img[data-v-product-image-src], img[data-v-product-image]", product);
-		let name = $("[data-v-product-name]:first", product).text();
-		let quantity = $('[name="quantity"]:first', product).val() ?? 1;
-		let id = this.dataset.product_id;
+		let img = product.querySelector("img[data-v-product-image], img[data-v-product-image-src], img[data-v-product-image], img[data-v-product-main-image]");
+		let name = product.querySelector("[data-v-product-name]").textContent ?? "";
+		let quantity = product.querySelector('[name="quantity"]')?.value ?? 1;
+		let id = this.dataset.product_id ?? product.dataset.product_id;
 		let options = {quantity};
 
 		if (!id) {
-			id = product[0].dataset.product_id;
+			id = product.dataset.product_id;
 			if (!id) {
-				id = $('input[name="product_id"]', product).val();
+				id = product.querySelector('input[name="product_id"]').value;
 			}
 		}
 		
 		let cart_add_text = 'was added to cart';
-		if (e.currentTarget.form) {
-			options = objectSerialize($(e.currentTarget.form).serializeArray());
-			if (!e.currentTarget.form.checkValidity()) {
-				e.currentTarget.form.requestSubmit();
+		let target = e.target.closest("button, input");
+
+		if (target?.form) {
+			options = Object.fromEntries(new URLSearchParams(new FormData(target.form)));
+			if (!target.form.checkValidity()) {
+				target.form.requestSubmit();
 				return false;
 			}
 		}
 
-		VvvebTheme.Cart.add(id, options, this, '.mini-cart', function() {
-			let src = img.attr("src");
+		VvvebTheme.Cart.add(id, options, this, ['.mini-cart', '[data-v-notifications]'], function() {
+			let src = img.getAttribute("src");
 			VvvebTheme.Alert.show(`
 			<div class="clearfix">
 				<img  class="float-start me-2" height="80" src="${src}"> &ensp; 
@@ -351,87 +437,121 @@ VvvebTheme.Gui = {
 			</div>`);
 		});
 		
+		e.preventDefault();
 		return false;
 	},	
 	
-	removeFromCart : function (e) {
+	removeFromCart: function(e) {
 		
-		let product = $(this).parents("[data-v-product]");
-		if (!product.length) {
-			product = $(this).parents("[data-v-component-product]");
+		let product = this.closest("[data-v-product]");
+		if (!product) {
+			product = this.closest("[data-v-component-product]");
 		}
-		if (!product.length) {
-			product = $(this).parents("[data-v-cart-product]");
+		if (!product) {
+			product = this.closest("[data-v-cart-product]");
 		}
-		let img = $("[data-v-product-image],[data-v-product-image], [data-v-cart-product-image]", product).attr("src");
-		let name = $("[data-v-product-name]", product).text();
+		let img = product.querySelector("[data-v-product-image],[data-v-product-image], [data-v-cart-product-image]")?.getAttribute("src") ?? "";
+		let name = product.querySelector("[data-v-product-name]")?.textContent ?? "";
 		let id = this.dataset.product_id;
 		let selector = this.dataset.selector ?? '.cart-box';
 
 		if (!id) {
-			id = product[0].dataset.product_id;
+			id = product.dataset.product_id;
 			if (!id) {
-				id = $('input[name="product_id"]', product).val();
+				id = product.querySelector('input[name="product_id"]').value;
 			}
 		}
 		
-		VvvebTheme.Cart.remove(id, this, selector, function(data) {
+		VvvebTheme.Cart.remove(id, this, ['.mini-cart', '[data-v-notifications]'], function() {
 			VvvebTheme.Alert.show('<img height=50 src="' + img + '"> &ensp; <strong>' +  name +'</strong> was removed from cart');
 			product.remove();
 		});
 		
+		e.preventDefault();
 		return false;
 	},
 	
-	addToWishlist : function (e) {
+	addToWishlist: function(e) {
+		let product = elementProduct(this);
+		let id = this.dataset.product_id ?? product.dataset.product_id;
+		let img = product.querySelector("img[data-v-product-image], img[data-v-product-image], img[data-v-cart-product-image], img[data-v-product-main-image]")?.getAttribute("src") ?? "";
+
+		if (!id) {
+			id = product.dataset.product_id;
+			if (!id) {
+				id = product.querySelector('input[name="product_id"]').value;
+			}
+		}
+
+		VvvebTheme.Wishlist.add(id, this, false, function(data) {
+			VvvebTheme.Alert.show('<img height=50 src="' + img + '"> &ensp; <strong>' +  name +'</strong> was added to wishlist');
+		});
+		
+		e.preventDefault();
 		return false;
 	},
 	
-	addToCompare : function (e) {
+	addToCompare: function(e) {
+		let product = elementProduct(this);
+		let id = this.dataset.product_id ?? product.dataset.product_id;
+		let img = product.querySelector("img[data-v-product-image], img[data-v-product-image], img[data-v-cart-product-image], img[data-v-product-main-image]")?.getAttribute("src") ?? "";
+
+		if (!id) {
+			id = product.dataset.product_id;
+			if (!id) {
+				id = product.querySelector('input[name="product_id"]').value;
+			}
+		}
+
+		VvvebTheme.Compare.add(id, this, false, function(data) {
+			VvvebTheme.Alert.show('<img height=50 src="' + img + '"> &ensp; <strong>' +  name +'</strong> was added to compare');
+		});
+		
+		e.preventDefault();
 		return false;
 	},
 	
 
-	replyTo : function (e) {
+	replyTo: function(e) {
 		let commentId = this.dataset.comment_id;
 		let commentAuthor = this.dataset.comment_author;
 		let commentForm = document.getElementById("comment-form");
 		//location.hash = "#comment-form";
+		/*
 		window.scrollTo({
 		  top: commentForm.offsetTop + commentForm.clientHeight,
 		  left: 0,
 		  behavior: "smooth",
-		});
+		});*/
 		
-		$("input[name=parent_id]", commentForm).val(commentId);
+		commentForm.querySelector("input[name=parent_id]").value = commentId;
 
 		if (commentId > 0) {
-			$(".replyto").show();
-			$(".replyto [data-comment-author]").html(commentAuthor);
+			document.querySelector(".replyto").style.display = "";
+			document.querySelector(".replyto [data-comment-author]").innerHTML = commentAuthor;
 		} else {
-			$(".replyto").hide();
+			document.querySelector(".replyto").style.display = "none";
 		}
-		
+		e.preventDefault();
 		return false;
 	},
 
-	addComment : function (e) {
+	addComment: function(e) {
 		let selector = this.dataset.selector ?? ".post-comments";
 		let form = this;
-		let parameters = $(form).serializeArray();
+		let parameters = Object.fromEntries(new URLSearchParams(new FormData(form)));
 		
 		VvvebTheme.Comments.add(parameters, this, selector, function () {
 			form.reset();
 		});
 		
 		e.preventDefault();
-		
 	},	
 	
-	addReview : function (e) {
+	addReview: function(e) {
 		let selector = this.dataset.selector ?? ".product-reviews";
 		let form = this;
-		let parameters = $(form).serializeArray();
+		let parameters = Object.fromEntries(new URLSearchParams(new FormData(form)));
 		parameters['module'] = 'product/product';
 		parameters['action'] = 'addReview';
 		
@@ -443,10 +563,10 @@ VvvebTheme.Gui = {
 		
 	},		
 	
-	addQuestion : function (e) {
+	addQuestion: function(e) {
 		let selector = this.dataset.selector ?? ".product-questions";
 		let form = this;
-		let parameters = $(form).serializeArray();
+		let parameters = Object.fromEntries(new URLSearchParams(new FormData(form)));
 		parameters['module'] = 'product/product';
 		parameters['action'] = 'addQuestion';
 		
@@ -455,45 +575,73 @@ VvvebTheme.Gui = {
 		});
 		
 		e.preventDefault();
-		
 	},	
 	
-	search : function (e) {
+	search: function (e) {
 		clearTimeout(window.searchDebounce);
-		
-		let parameters = $(this).serializeArray();
+		let form = this;
+		if (this.form) {
+			form = this.form;
+		}
+
+		let parameters = Object.fromEntries(new URLSearchParams(new FormData(form)));
+		let element = this;
+		let selector = this.dataset.selector;
 		
 		window.searchDebounce = setTimeout(function () {	
-			$("[data-v-component-search]").css("opacity", 0.5);
-			VvvebTheme.Search.query(parameters, this, function(data) { 
-				$("[data-v-component-search]")[0].outerHTML = data;
+			VvvebTheme.Search.query(parameters, element, selector, function(data) { 
+				component.outerHTML = data;
 		});
 		e.preventDefault();
 		
 		}, 1000);
 	},
 	
-	login : function (e) {
-		let parameters = $(this).serializeArray();
+	login: function (e) {
+		let parameters = Object.fromEntries(new URLSearchParams(new FormData(this)));
 		let componentUser;
 		let url = this.dataset.vUrl ?? false;
 		let selector = this.dataset.selector ?? '.user-box';
-		
+
 		if (url) {
 			VvvebTheme.User.module = url;
 		}
 
-		componentUser = $(this).parents('[data-v-component-user]'); 
-		//parameters['component_id'] = $('[data-v-component-user]').index(componentUser);
+		componentUser = this.closest('[data-v-component-user]'); 
+		//parameters['component_id'] = document.querySelectorAll('[data-v-component-user]').index(componentUser);
 
 		VvvebTheme.User.login(parameters, this, selector/*, function(data) { 
 			
-			//$("[data-v-component-user]")[0].outerHTML = data;
+			//document.querySelectorAll("[data-v-component-user]")[0].outerHTML = data;
 			componentUser.html(data);
 			//	alert("Login");
 		}*/);
 		e.preventDefault();
+	},	
+	
+	//used to submit any form without refreshing page, used for contact forms
+	submit: function (e) {
+		let form = this;
+		let parameters = Object.fromEntries(new URLSearchParams(new FormData(form)));
+		let componentUser;
+		let url = this.dataset.vUrl ?? false;
+		let selector = this.dataset.selector;
+		let loading = this.querySelector("button .loading, .btn .loading");
 		
+		if (loading) {
+			loading.classList.remove("d-none");
+			loading.parentNode.querySelector(".button-text")?.classList.add("d-none");
+		}
+
+		loadAjax(url, selector, () => {
+			if (loading) {
+				loading.classList.add("d-none");
+				loading.parentNode.querySelector(".button-text")?.classList.remove("d-none");
+				form.reset();
+			}
+		}, parameters, "post");
+
+		e.preventDefault();
 	}
 }	
 
@@ -505,96 +653,103 @@ let delay = (function(){
   };
 })();
 
+function isEditor () {
+	return document.getElementById("vvvebjs-styles") || window.location.href.includes('r=');
+}
 
 let urlCache = {};
 
 function preloadUrl(e) {
 		delay(() => loadUrl(e, true), 200);
 }
-
-/*
-function loadUrl(e, preload = false) {
-		let element = e.currentTarget;
-		let url = element.href;
-		let selector = e.data.update;
 		
-		if (!selector) selector = "body";
-		
-		if  (urlCache.hasOwnProperty(url)) {
-			let page =  urlCache[url];
-			if (page && !preload) {
-				$(selector).replaceWith($(selector, $(page)));
-			}
-			return;
-		} else if (!preload) {
-			urlCache[url] = false;//set loading flag
-		}
-		
-		$.ajax({
-			dataType : 'html',
-			url      : url,
-			cache: true,
-			success  : function(data) {
-				
-				//if not preloading or cache loading flag set then update page
-				if (!preload || (preload && urlCache.hasOwnProperty(url) && urlCache[url] === false)) {
-					let page =  $(data);
-					$(selector).replaceWith($(selector, page));
-				}
-				urlCache[url] = data;
-			}
-		});
-		//let selector = e.
-		//if (!selector) selector = "body";
-		
-		e.preventDefault();
-		return false;
-}
-
-if (preloadUrls) {
-		for (url in preloadUrls) {
-			let link = preloadUrls[url];
-
-			$("body").on("mouseenter",link["link"], link, preloadUrl);
-			$("body").on("click",link["link"], link, loadUrl);
-		}
-}
-*/
-		
-jQuery(document).ready(function() {
-	VvvebTheme.Gui.init();
-});
-
 //ajax url
-function loadAjax(url, selector, callback = null) {
-	$.ajax({
-		url
-	}).done(function (data) {
-		let content = $(selector, data);
-		if (content.length) {
-			$(selector).html(content.html());
-			if (callback) {
-				callback();
+function loadAjax(url, selector, callback = null, params = {}, method = "get") {
+	let options = {method};
+	if (method == "post" && params) {
+		options.body = new URLSearchParams(params);
+	}
+	
+	if (!url) url = window.location.href;
+	
+	fetch(url, options).
+	then((response) => {
+		//if (!response.ok) { throw new Error(response) }
+		return response.text()
+	}).
+	then(function (data) {
+		if (selector) {
+			let response = new DOMParser().parseFromString(data, "text/html");
+
+			if (!Array.isArray (selector) ) {
+				selector = [selector];
 			}
 			
-			$(window).trigger("vvveb.loadUrl", {url, selector});
-		}
-	}).fail(function (data) {
-		alert(data.responseText);
+			for (k in selector) {
+				let elementSelector = selector[k];
+				let currentElements = document.querySelectorAll(elementSelector);
+				let newElements = response.querySelectorAll(elementSelector);
+				
+				if (currentElements && newElements) {
+					if (currentElements.length != newElements.length) {
+						//new elements does not match corresponding elements on the page, reload hole page
+						response = new DOMParser().parseFromString(data, "text/html")
+						document.querySelector("body").replaceWith(response.querySelector("body"));
+						break;
+					}
+				
+					currentElements.forEach( (e, i) => {e.replaceWith(newElements[i])});
+				} if (currentElements) {
+					currentElements.forEach(e => e.remove());
+				} else if (newElements) {
+					//new elements don't  have corresponding elements on the page, reload hole page
+					response = new DOMParser().parseFromString(data, "text/html")
+					document.querySelector("body").replaceWith(response.querySelector("body"));
+					break;
+				}
+			}
+			
+			if (callback) callback();
+		}		
+
+		window.dispatchEvent(new CustomEvent("vvveb.loadUrl", {detail: {url, selector}}));
+	}).catch(error => {
+		console.log(error);
 	});
 }
 
-$("body").on("click", "a[data-url]", function (e) {
-	let $this = $(this);
-	let selector = this.dataset.selector ?? "";
-	let url = $this.attr("href") ?? "";
-	
-	if (!url) return;
-	
-	loadAjax(url, selector, () => window.history.pushState({url, selector}, null, url));
-	
-	e.preventDefault();
-});
+
+VvvebTheme.ajax = {
+	selector:"a[data-url], a[data-page-url], a[data-v-menu-item-url], a[data-v-post-url], a[data-v-product-url], a[data-v-cat-url], a[data-v-archive-url], a[data-v-admin-url], a[data-v-post-author-url], a[data-v-breadcrumb-item-url], a[data-v-categories-cat-url]",
+	siteContainer:["#site-content", "body > section"],
+	scrollContainer:"body",
+	skipUrl:[]
+}
+
+if (!isEditor()) {
+	document.addEventListener("click", function (e) {
+		let element = e.target.closest(VvvebTheme.ajax.selector);
+		if (element) {
+			let url = element.getAttribute("href") ?? "";
+			if (!url || (url.indexOf("//") != -1) //external url
+				|| (VvvebTheme.ajax.skipUrl.length && (VvvebTheme.ajax.skipUrl.includes(url) || VvvebTheme.ajax.skipUrl.includes(window.location.pathname)))
+			) return;
+			
+			let selector = element.dataset.selector ?? VvvebTheme.ajax.siteContainer;
+
+			loadAjax(url, selector, () => { 
+				//if (element.dataset.scroll) {
+					let target          = document.querySelector(VvvebTheme.ajax.scrollContainer);
+					let scrollTo        = element.dataset.scroll ?? (selector == VvvebTheme.ajax.siteContainer ? "start" : "center");
+					target.scrollIntoView({behavior: "smooth", block: scrollTo, inline: scrollTo});
+				//}
+				window.history.pushState({url, selector}, null, url); 
+			});
+			
+			e.preventDefault();
+		}
+	});
+}
 
 addEventListener("popstate", checkState);
 
@@ -605,3 +760,6 @@ function checkState(e) {
 }
 
 window.history.pushState({url:window.location.pathname, selector:".content-body"}, null, window.location.href);
+
+
+VvvebTheme.Gui.init();

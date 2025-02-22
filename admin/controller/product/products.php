@@ -45,6 +45,68 @@ class Products extends Base {
 		return parent::init();
 	}
 
+	function duplicate() {
+		$product_id    = $this->request->product['product_id'] ?? $this->request->get['product_id'] ?? false;
+
+		if ($product_id) {
+			$this->products   = new ProductSQL();
+			$data             = $this->products->get(['product_id' => $product_id, 'type' => $this->type]);
+
+			unset($data['product_id']);
+			$id = rand(1, 1000);
+
+			foreach ($data['product_content'] as &$content) {
+				unset($content['product_id']);
+				$content['name'] .= ' [' . __('duplicate') . ']';
+				$content['slug'] .= '-' . __('duplicate') . "-$id";
+			}
+
+			if (isset($data['product_to_taxonomy_item'])) {
+				foreach ($data['product_to_taxonomy_item'] as &$item) {
+					$taxonomy_item[] = $item['taxonomy_item_id'];
+				}
+			}
+
+			if (isset($data['product_to_site'])) {
+				foreach ($data['product_to_site'] as &$item) {
+					$site_id[] = $item['site_id'];
+				}
+			}
+
+			if ($data) {
+				$result = $this->products->add([
+					'product'          => $data,
+					'product_content'  => $data['product_content'],
+					'taxonomy_item'    => $taxonomy_item ?? [],
+					'site_id'          => $site_id,
+				]);
+
+				if ($result && isset($result['product'])) {
+					$product_id = $result['product'];
+
+					if ($data['product_image']) {
+						$product_image = [];
+
+						foreach ($data['product_image'] as $image) {
+							$product_image[] = $image['image'];
+						}
+						$images = $this->products->productImage(['product_image' => $product_image, 'product_id' => $product_id]);
+					}
+
+					$url        = url(['module' => 'product/product', 'product_id' => $product_id, 'type' => $this->type]);
+
+					$success = ucfirst($this->type) . __(' duplicated!');
+					$success .= sprintf(' <a href="%s">%s</a>', $url, __('Edit') . " {$this->type}");
+					$this->view->success[] = $success;
+				} else {
+					$this->view->errors[] = sprintf(__('Error duplicating %s!'),  $this->type);
+				}
+			}
+		}
+
+		return $this->index();
+	}
+
 	function delete() {
 		$product_id    = $this->request->post['product_id'] ?? $this->request->get['product_id'] ?? false;
 
@@ -71,7 +133,15 @@ class Products extends Base {
 		$view     = View :: getInstance();
 		$products = new ProductSQL();
 
-		$this->filter = $this->request->get['filter'] ?? [];
+		$this->filter = array_filter($this->request->get['filter'] ?? []);
+
+		if (isset($this->filter['vendor_id'])) {
+			$this->filter['vendor_id'] = [$this->filter['vendor_id']];
+		}
+
+		if (isset($this->filter['manufacturer_id'])) {
+			$this->filter['manufacturer_id'] = [$this->filter['manufacturer_id']];
+		}
 
 		$options = [
 			'type'        => $this->type,
@@ -89,8 +159,8 @@ class Products extends Base {
 
 		$defaultTemplate = "product/{$this->type}.html";
 
-		if ($results && isset($results['products'])) {
-			foreach ($results['products'] as $id => &$product) {
+		if ($results && isset($results['product'])) {
+			foreach ($results['product'] as $id => &$product) {
 				if (isset($product['images'])) {
 					$product['images'] = json_decode($product['images'], 1);
 
@@ -103,13 +173,16 @@ class Products extends Base {
 					}
 				}
 
-				$template              = (isset($product['template']) && $product['template']) ? $product['template'] : $defaultTemplate;
-				$product['url']        = url(['module' => 'product/product', 'product_id' => $product['product_id'], 'type' => $product['type']]);
-				$product['edit-url']   = url(['module' => 'product/product', 'product_id' => $product['product_id'], 'type' => $product['type']]);
-				$product['delete-url'] = url(['module' => 'product/products', 'action' => 'delete', 'product_id[]' => $product['product_id'], 'type' => $product['type']]);
-				$product['view-url']   =  url('product/product/index', $product);
-				$admin_path            = \Vvveb\config('admin.path', 'admin') . '/';
-				$product['design-url'] = '/' . $admin_path . url(['module' => 'editor/editor', 'url' => $product['view-url'], 'template' => $template], false, false);
+				$adminPath                = \Vvveb\adminPath();
+				$url                      = ['module' => 'product/product', 'product_id' => $product['product_id'], 'type' => $product['type']];
+				$template                 = (isset($product['template']) && $product['template']) ? $product['template'] : $defaultTemplate;
+				$product['url']           = url($url);
+				$product['edit-url']      = url(['module' => 'product/product', 'product_id' => $product['product_id'], 'type' => $product['type']]);
+				$product['delete-url']    = url(['module' => 'product/products', 'action' => 'delete'] + $url + ['product_id[]' => $product['product_id']]);
+				$product['duplicate-url'] = url(['module' => 'product/products', 'action' => 'duplicate'] + $url + ['product_id' => $product['product_id']]);
+				$product['view-url']      = url('product/product/index', $product + $url + ['host' => $this->global['site_url']]);
+				$relativeUrl              = url('product/product/index', $product + $url);
+				$product['design-url']    = url(['module' => 'editor/editor', 'name' => urlencode($product['name'] ?? ''), 'url' => $relativeUrl, 'template' => $template, 'host' => $this->global['site_url'] . $adminPath], false, false);
 			}
 		}
 

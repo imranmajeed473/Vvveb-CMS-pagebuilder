@@ -39,6 +39,9 @@ class Sites extends Base {
 		$site_id    = $this->request->post['site_id'] ?? $this->request->get['site_id'] ?? false;
 
 		if ($site_id) {
+			$active_deleted = false;
+			$active_site_id = $this->session->get('site_id');
+
 			if (is_numeric($site_id)) {
 				$site_id = [$site_id];
 			}
@@ -48,6 +51,10 @@ class Sites extends Base {
 
 				if ($site) {
 					SitesList::deleteSite($site);
+				}
+
+				if ($id == $active_site_id) {
+					$active_deleted = true;
 				}
 			}
 
@@ -60,6 +67,10 @@ class Sites extends Base {
 
 			if ($result && isset($result['site'])) {
 				$this->view->success[] = ucfirst(__('site')) . __(' deleted!');
+				//if active site was deleted set the next valid site as active
+				if ($active_deleted) {
+					$this->setSite();
+				}
 			} else {
 				$this->view->errors[] = sprintf(__('Error deleting %s!'),  __(' site'));
 			}
@@ -90,14 +101,14 @@ class Sites extends Base {
 			]
 		);
 
-		if (isset($results['sites'])) {
-			foreach ($results['sites'] as &$site) {
+		if (isset($results['site'])) {
+			foreach ($results['site'] as &$site) {
 				$site['url']         = SitesList::url($site['host']);
 				$site['delete-url']  = \Vvveb\url(['module' => 'settings/sites', 'action' => 'delete', 'site_id[]' => $site['site_id']]);
 			}
 		}
 
-		$view->sitesList = $results['sites'] ?? [];
+		$view->sitesList = $results['site'] ?? [];
 		$view->count     = $results['count'] ?? 0;
 	}
 }

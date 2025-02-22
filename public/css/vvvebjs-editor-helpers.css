@@ -56,6 +56,9 @@ body {
 /*
 Prevents iframe mouse events that prevents clicking on the component  
  */
+[data-component-lottie] > svg,
+[data-component-oembed] iframe,
+[data-component-oembed] > div,
 [data-component-video] > iframe,
 [data-component-maps] > iframe,
 [data-component-twitter] > iframe,
@@ -67,6 +70,12 @@ Prevents iframe mouse events that prevents clicking on the component
   outline: none; }
   [contenteditable="true"]:focus-visible {
     outline: none; }
+
+.is-dragged {
+  pointer-events: none;
+  opacity: 0.15;
+  position: relative;
+}
 
 .vvveb-hidden {
   display: none !important; }
@@ -105,10 +114,10 @@ section:hover .container div > .row > .col, section:hover .container > .row > [c
 section:hover .container > .row > .col, section:hover .container-fluid div > .row > [class*="col-"],
 section:hover .container-fluid div > .row > .col, section:hover .container-fluid > .row > [class*="col-"],
 section:hover .container-fluid > .row > .col {
-  outline: 1px dashed lime;
+  outline: 1px dashed rgba(var(--bs-success-rgb), 0.35);
   outline-offset: -2px; }
 
 .row:hover > [class*="col-"],
 .row:hover > .col {
-  outline: 1px dashed lime;
+  outline: 1px dashed rgba(var(--bs-success-rgb), 0.35);
   outline-offset: -2px; }

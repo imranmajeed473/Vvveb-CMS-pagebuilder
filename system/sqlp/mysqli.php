@@ -11,9 +11,28 @@ class %name%SQL {
 
 	private $db;
 	
+	protected $filters = %filters%;
+	
+	protected $paramTypes = %paramTypes%;
+	
 	public function __construct(){
 		$this->db = Db::getInstance();
 	}
+	
+	public function validate($data, $method, $table = '', $ignoreMissing = false) {
+		$params = $this->paramTypes[$method] ?? [];
+		if (!$params) {
+			return false;
+		}
+		
+		foreach ($params as $name => $type) {
+			if (isset($this->filters[$name])) {
+				$params[$name] = $this->filters[$name];
+			}
+		}
+		
+		return $this->db->validate($data, $params, $table, $ignoreMissing);
+	}	
 
 	%methods_start%
 	
@@ -88,7 +107,15 @@ class %name%SQL {
 						}
 					}
 				} else  {
-					$results['%query_id%'] = %fetch%;
+					if (isset($results['%query_id%'])) {
+						//if multiple results like insert id from @EACH
+						if (!is_array($results['%query_id%'])){
+							$results['%query_id%'] = [$results['%query_id%']];
+						}
+						$results['%query_id%'][] = %fetch%;
+					} else {
+						$results['%query_id%'] = %fetch%;
+					}
 				}
 			}
 		}

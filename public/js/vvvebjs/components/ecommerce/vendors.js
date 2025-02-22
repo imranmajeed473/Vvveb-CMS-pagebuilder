@@ -35,7 +35,7 @@ class VendorsComponent {
 	constructor ()
 	{
 		this.name = "Vendors";
-		this.attributes = ["data-v-component-vendors"],
+		this.attributes = ["data-v-component-product-vendors"],
 
 		this.image ="icons/vendor.svg";
 		this.html = template;
@@ -45,14 +45,16 @@ class VendorsComponent {
 
     init(node)
 	{
-		$('.mb-3[data-v-group]').attr('style','display:none !important');
-		if (node.dataset.type != undefined)
-		{
-			$('.mb-3[data-v-group="'+ node.dataset.type + '"]').attr('style','');
-		} else
-		{		
-			$('.mb-3[data-v-group]:first').attr('style','');
-		}
+		document.querySelectorAll('.mb-3[data-group]').forEach((el, i) => {
+			el.classList.add("d-none");
+		});			
+		
+		let source = node.dataset.vSource;
+		if (!source) {
+			source = "automatic";
+		} 
+
+		document.querySelectorAll('.mb-3[data-group="' + source + '"]').forEach(e => e.classList.remove("d-none"));
 	}
 }
 

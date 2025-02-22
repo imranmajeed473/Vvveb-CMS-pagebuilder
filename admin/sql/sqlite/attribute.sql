@@ -4,7 +4,7 @@
 
 	PROCEDURE getAll(
 		IN language_id INT,
-		IN product_id INT,
+		IN product_id ARRAY,
 		IN attribute_group_id INT,
 		IN start INT,
 		IN limit INT,
@@ -16,10 +16,11 @@
 		SELECT attribute_content.name, attribute_group_content.name as `group`, attribute.*
 				@IF isset(:product_id)
 				THEN		
+					, pa.product_id
 					,pa.value
 				END @IF		
 		
-			FROM attribute AS attribute
+			FROM attribute
 			INNER JOIN attribute_content 
 				ON attribute_content.attribute_id = attribute.attribute_id AND attribute_content.language_id = :language_id
 			INNER JOIN attribute_group_content 
@@ -34,7 +35,7 @@
 			
 		@IF isset(:product_id)
 		THEN		
-			AND pa.product_id = :product_id
+			AND pa.product_id IN (:product_id)
 		END @IF
 
 		@IF isset(:attribute_group_id)
@@ -83,12 +84,13 @@
 
 	PROCEDURE add(
 		IN attribute ARRAY,
+		OUT insert_id,
 		OUT insert_id
 	)
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:attribute_data  = @FILTER(:attribute, attribute);
+		:attribute_data  = @FILTER(:attribute, attribute)
 		
 		
 		INSERT INTO attribute 
@@ -98,7 +100,7 @@
 	  	VALUES ( :attribute_data );		
 		
 		
-		:attribute_content  = @FILTER(:attribute, attribute_content);
+		:attribute_content  = @FILTER(:attribute, attribute_content)
 	  	
 		INSERT INTO attribute_content 
 			
@@ -119,7 +121,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		:attribute_data = @FILTER(:attribute, attribute);
+		:attribute_data = @FILTER(:attribute, attribute)
 
 		UPDATE attribute
 			
@@ -128,7 +130,7 @@
 		WHERE attribute_id = :attribute_id;
 		
 		-- allow only table fields and set defaults for missing values
-		:attribute_content = @FILTER(:attribute, attribute_content);
+		:attribute_content = @FILTER(:attribute, attribute_content)
 
 		UPDATE attribute_content
 			

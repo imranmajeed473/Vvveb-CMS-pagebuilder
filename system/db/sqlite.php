@@ -93,7 +93,7 @@ class Sqlite extends DBDriver {
 	/*
 	 * Get all columns for a table used for sanitizing input
 	 */
-	function getColumnsMeta($tableName) {
+	function getColumnsMeta($tableName, $comment = false) {
 		$sql =
 		"SELECT type as t, name, dflt_value as d, `notnull` as n FROM pragma_table_info('$tableName');";
 
@@ -240,7 +240,7 @@ class Sqlite extends DBDriver {
 			throw new \Exception($message, $e->getCode());
 		}
 
-		if ($stmt && ! empty($paramTypes)) {
+		if ($stmt/* && ! empty($paramTypes)*/) {
 			foreach ($parameters as $key => $value) {
 				$type  = $types[$key] ?? 's';
 				$type  = ($type == 'i') ? SQLITE3_INTEGER : SQLITE3_TEXT;
@@ -258,6 +258,8 @@ class Sqlite extends DBDriver {
 		}
 
 		if ($stmt) {
+			$result = null;
+
 			try {
 				if ($result = $stmt->execute()) {
 					$this->affected_rows = self :: $link->changes();

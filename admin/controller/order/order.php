@@ -25,12 +25,18 @@ namespace Vvveb\Controller\Order;
 use function Vvveb\__;
 use Vvveb\Controller\Base;
 use Vvveb\Controller\Content\AutocompleteTrait;
+use function Vvveb\email;
 use function Vvveb\orderStatusBadgeClass;
+use function Vvveb\paymentStatusBadgeClass;
 use function Vvveb\prefixArrayKeys;
+use function Vvveb\shippingStatusBadgeClass;
+use function Vvveb\siteSettings;
 use Vvveb\Sql\Order_LogSQL;
 use Vvveb\Sql\OrderSQL;
 use Vvveb\System\Cart\Cart;
 use Vvveb\System\Cart\Currency;
+use Vvveb\System\Cart\Order as SystemOrder;
+use Vvveb\System\Cart\OrderCart;
 use Vvveb\System\Core\View;
 use Vvveb\System\Images;
 use Vvveb\System\Payment;
@@ -45,14 +51,17 @@ class Order extends Base {
 	protected $type = 'order';
 
 	function index() {
-		$view = View :: getInstance();
+		$site = siteSettings($this->global['site_id']);
+		$options = array_intersect_key($site,
+		array_flip(['weight_type_id', 'length_type_id', 'currency_id', 'country_id']));
 
-		$cart     = Cart::getInstance($this->global);
+		$cart     = Cart::getInstance($options);
 		$payment  = Payment::getInstance();
 		$shipping = Shipping::getInstance();
+		$view     = $this->view;
 
-		$this->view->order_payment  = $payment->getMethods();
-		$this->view->order_shipping = $shipping->getMethods();
+		$this->view->order_payment  = $payment->getMethods([]);
+		$this->view->order_shipping = $shipping->getMethods([]);
 
 		if (isset($this->request->get['order_id'])) {
 			$options = ['order_id' => (int)$this->request->get['order_id'], 'type' => $this->type] + $this->global;
@@ -75,6 +84,16 @@ class Order extends Base {
 							}
 						}
 
+						if (isset($product['option_value'])) {
+							$product['option_value'] = json_decode($product['option_value'], true);
+
+							foreach ($product['option_value'] as &$option) {
+								if (isset($option['price'])) {
+									$option['price_formatted'] = $currency->format($option['price']);
+								}
+							}
+						}
+
 						if (isset($product['image']) && $product['image']) {
 							$product['image'] =Images::image($product['image'], 'product');
 							//$product['images'][] = ['image' => Images::image($product['image'], 'product')];
@@ -90,16 +109,18 @@ class Order extends Base {
 				}
 
 				$order                    = &$results['order'];
-				$oder['user_url']         = \Vvveb\url(['module' => 'user/user', 'user_id' => $order['user_id']]);
+				$order['user_url']        = \Vvveb\url(['module' => 'user/user', 'user_id' => $order['user_id']]);
 				$order['total_formatted'] = $currency->format($order['total']);
 				$order['shipping_data']   = json_decode($order['shipping_data'] ?? '', true);
 				$order['payment_data']    = json_decode($order['payment_data'] ?? '', true);
 				$order['class']           = orderStatusBadgeClass($order['order_status_id']);
+				$order['payment_class']   = paymentStatusBadgeClass($order['payment_status_id']);
+				$order['shipping_class']  = shippingStatusBadgeClass($order['shipping_status_id']);
 
 				$order += prefixArrayKeys('shipping_', $order['shipping_data']) ?? [];
 				$order += prefixArrayKeys('payment_', $order['payment_data']) ?? [];
 
-				$data     		      = $orders->getData($order);
+				$data = $orders->getData($order);
 
 				$view->set($data);
 				$view->set($results);
@@ -107,6 +128,7 @@ class Order extends Base {
 				$url                    = ['module' => 'order/order', 'action' => 'print', 'order_id' => $order['order_id']];
 				$view->printUrl 	       = \Vvveb\url($url);
 				$view->printShippingUrl = \Vvveb\url(['action' => 'printShipping'] + $url);
+				$view->printInvoiceUrl  = \Vvveb\url(['action' => 'printInvoice'] + $url);
 			} else {
 				return $this->notFound(true, __('Order not found!'));
 			}
@@ -126,23 +148,59 @@ class Order extends Base {
 		return $this->index();
 	}
 
+	function printInvoice() {
+		return $this->index();
+	}
+
 	function cart() {
-		$order_id    = $this->request->get['order_id'] ?? false;
-		$product_id  = $this->request->post['product_id'] ?? false;
-		$quantity    = $this->request->post['quantity'] ?? 1;
+		$order_id   = $this->request->get['order_id'] ?? false;
+		$product_id = $this->request->post['product_id'] ?? false;
+		$quantity   = $this->request->post['quantity'] ?? 1;
+		$name       = $this->request->post['name'] ?? '';
+		$model      = $this->request->post['model'] ?? '';
+		$price      = $this->request->post['price'] ?? 1;
 
 		if ($order_id && $product_id) {
-			$order = new OrderSQL();
-			$order->addProducts(['order_id' => $order_id, 'products' => [['product_id' => $product_id, 'quantity' => $quantity]]]);
+			$product  = compact('product_id','quantity', 'name', 'price', 'model');
+
+			$site    = siteSettings($this->global['site_id']);
+			$options = $this->global + $site;
+			unset($options['admin_id']);
+
+			$order = new OrderCart($order_id, $options);
+			$order->add($product_id, false, $quantity, []);
+			$order->updateCart();
+			$order->write();
 		}
 
 		$this->index();
 	}
 
+	private function sendNotification($order_id, $email, $message) {
+		try {
+			$error =  __('Error sending order confirmation mail!');
+
+			if (! email([$email], sprintf(__('Order update #%s'), $order_id), 'order/update', ['message' => $message])) {
+				$this->session->set('errors', $error);
+				$this->view->errors[] = $error;
+			}
+		} catch (\Exception $e) {
+			if (DEBUG) {
+				$error .= "\n" . $e->getMessage();
+			}
+			$this->session->set('errors', $error);
+			$this->view->errors[] = $error;
+		}
+	}
+	
 	function saveLog() {
 		$order_id  = $this->request->get['order_id'] ?? false;
 		$log       = $this->request->post['log'] ?? [];
+		$notify    = $log['notify'] ?? false;
+		$public    = $log['public'] ?? false;
 		$view      = $this->view;
+		
+		$this->index();
 
 		if ($order_id && $log) {
 			// update order status with the last log status
@@ -155,15 +213,26 @@ class Order extends Base {
 
 				if (isset($result['order_log']) && $result['order_log']) {
 					$view->success = [__('Order status saved!')];
+					
+					$this->view->log[] = $log;
+					
+					if ($notify) {
+						$message = '';
+
+						if ($public) { 
+							$message = $log['note'];
+						}
+						
+						$email = $this->view->order['email'];
+						$this->sendNotification($order_id, $email, $message);
+					}
 				} else {
-					$view->errors = [$orderLog->error];
+					$view->errors[] = $orderLog->error;
 				}
 			} else {
-				$view->errors = [$order->error];
+				$view->errors[] = $order->error;
 			}
 		}
-
-		return $this->index();
 	}
 
 	function save() {
@@ -196,11 +265,13 @@ class Order extends Base {
 					$view->errors = [$orders->error];
 				}
 			} else {
-				$result = $orders->add(['order' => $order + $this->global]);
+				$systemOrder      = SystemOrder::getInstance();
+				$order_id         = $systemOrder->add($order + $this->global);
+				//$result = $orders->add(['order' => $order + $this->global]);
 
-				if (isset($result['order'])) {
+				if (isset($order_id)) {
 					$view->success = __('Order saved!');
-					$url           = ['module' => 'order/order', 'order_id' => $result['order']];
+					$url           = ['module' => 'order/order', 'order_id' => $order_id];
 					$this->redirect($url);
 				} else {
 					$view->errors = [$orders->error];

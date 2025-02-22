@@ -43,7 +43,7 @@ class Lexer {
 
 		while (isset($string[$offset])) {
 			if (! preg_match($this->regex, $string, $matches, 0, $offset)) {
-				throw new Exception(sprintf('Unexpected character "%s" at offset %d', $string[$offset], $offset));
+				throw new \Exception(sprintf('Unexpected character "%s" at offset %d', $string[$offset], $offset));
 			}
 
 			// find the first non-empty element (but skipping $matches[0]) using a quick for loop
@@ -201,13 +201,24 @@ class Lexer {
 				function ($varMatch) use ($match) {
 					return
 					preg_replace_callback(
-						'/:(\w+)/ms',
+						'/:([\w\.]+)/ms',
 						function ($matches) {
-							return '$params[\'' . $matches[1] . '\']';
+							return '$' . \Vvveb\dotToArrayKey('params.' . $matches[1]);
+						//return '$params[\'' . $matches[1] . '\']';
 						},
 					$match[$varMatch[1]]);
 				},
 				$macro);
+
+				//@result
+				//replace result variables
+				$macro =
+					preg_replace_callback(
+						'/@result\.([\w\.]+)/',
+						function ($matches) {
+							return \Vvveb\dotToArrayKey('$results.' . $matches[1]);
+						},
+					$macro);
 
 				//replace macro template placeholders %placeholder
 				$macro = preg_replace_callback(

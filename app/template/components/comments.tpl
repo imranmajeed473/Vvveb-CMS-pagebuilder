@@ -24,14 +24,14 @@ if($_comments && is_array($_comments)) {
 		
 		@comment|data-comment_id = $comment['comment_id']
 		
-		@comment|addClass = <?php echo 'level-' . ($comment['level'] ?? 0);?>
+		@comment|addClass = <?php if (!$vvveb_is_page_edit) echo 'level-' . ($comment['level'] ?? 0);?>
 		
-		@comment|id = <?php echo 'comment-' . $comment['comment_id'];?>
+		@comment|id = <?php  if (!$vvveb_is_page_edit) echo 'comment-' . $comment['comment_id'];?>
 		
-		@comment [data-v-comment-content] = <?php echo $comment['content'];?>
+		@comment [data-v-comment-content] = $comment['content']
 		
 		@comment img[data-v-comment-*]|src = $comment['@@__data-v-comment-(*)__@@']
-		@comment img[data-v-comment-*]|width = <?php echo $comment['size'] ?? '60';?>
+		@comment img[data-v-comment-*]|width = <?php echo (int)($review['size'] ?? 60);?>
 		
 		@comment [data-v-comment-*]|innerText = $comment['@@__data-v-comment-(*)__@@']
 		

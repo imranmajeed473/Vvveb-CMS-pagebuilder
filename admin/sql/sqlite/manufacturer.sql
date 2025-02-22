@@ -50,7 +50,7 @@
 		-- SELECT * FROM manufacturer_option WHERE manufacturer_id = :manufacturer_id;
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:manufacturer, manufacturer);
+		@FILTER(:manufacturer, manufacturer)
 		
 		UPDATE manufacturer 
 			
@@ -70,7 +70,7 @@
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:manufacturer  = @FILTER(:manufacturer, manufacturer);
+		:manufacturer  = @FILTER(:manufacturer, manufacturer)
 
 		INSERT INTO manufacturer 
 		
@@ -109,7 +109,7 @@
 	)
 	BEGIN
 
-		SELECT * FROM manufacturer AS manufacturer
+		SELECT * FROM manufacturer
 		
 			LEFT JOIN manufacturer_to_site p2s ON (manufacturer.manufacturer_id = p2s.manufacturer_id) 
 			WHERE p2s.site_id = :site_id

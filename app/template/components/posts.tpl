@@ -22,15 +22,15 @@
 
 @post|deleteAllButFirstChild
 
-@posts [data-v-posts-category] = <?php $_category = current($posts['posts']);echo $_category['category'];?>
-@posts [data-v-posts-count] = <?php echo $posts['count'] ?? ''?>
+@posts [data-v-posts-category] = <?php $_category = current($posts['posts']);echo htmlspecialchars($_category['category']);?>
+@posts [data-v-posts-count]    = $posts['count']
 
 
 @post|before = <?php 
 //if no posts available and page is loaded in editor then set an empty post to show post content for the editor
 $_default = (isset($vvveb_is_page_edit) && $vvveb_is_page_edit ) ? [0 => []] : [];
 $_default = [0 => []];
-$_posts = empty($posts['posts']) ? $_default : $posts['posts'];
+$_posts = empty($posts['post']) ? $_default : $posts['post'];
 //$pagination = $this->posts[$_posts_idx]['pagination'];
 $count = 0;
 foreach ($_posts as $index => $post) {?>
@@ -46,9 +46,9 @@ foreach ($_posts as $index => $post) {?>
 		$size = '@@__data-v-size__@@';
 		if ($size) {
 			//$image = Vvveb\System\Images::size($image, $size);
-			echo $image;
+			echo htmlspecialchars($image);
 		} else {
-			echo $image;
+			echo htmlspecialchars($image);
 		}
 	?>
 	

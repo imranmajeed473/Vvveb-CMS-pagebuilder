@@ -11,7 +11,7 @@
 
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="css/install.css" rel="stylesheet">
-    <link href="../../admin/default/scss/ionicons.css" rel="stylesheet">
+    <link href="../../admin/default/css/ionicons.css" rel="stylesheet">
     <style>
     
     </style>
@@ -102,6 +102,15 @@
 								<p class="card-text" style="color:#777">These can be later changed from admin.</p>
 								
 									<form method="post">
+									 <div class="mb-3 row">
+										<label for="title" class="col-sm-3 col-form-label">Primary language</label>
+										<div class="col-sm-9">
+										 <select name="language" class="form-select py-2" data-v-language-list>
+											<option value="en">English</option>
+											<option value="ro">Romanian</option>
+										  </select>
+										</div>
+									  </div>
 									 <div class="mb-3 row">
 										<label for="title" class="col-sm-3 col-form-label">Website name</label>
 										<div class="col-sm-9">
@@ -281,8 +290,6 @@
 	}
     
     </script>
-    <script src="../../js/jquery.min.js"></script>
     <script src="../../admin/default/js/theme.js"></script>
-    		
   </body>
 </html>

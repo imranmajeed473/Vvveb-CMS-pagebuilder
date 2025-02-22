@@ -19,7 +19,7 @@
 	BEGIN
 		-- taxonomy_item
 		SELECT *, taxonomy_id as array_key 
-			FROM taxonomy as taxonomy 
+			FROM taxonomy 
 				-- LEFT JOIN taxonomy_to_site t2s ON (taxonomy_item.taxonomy_item_id = t2s.taxonomy_item_id) 
 			
 			WHERE 1 = 1
@@ -68,19 +68,19 @@
 
 	PROCEDURE add(
 		IN taxonomy ARRAY,
-		OUT insert_id
+		OUT fetch_one
 	)
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:taxonomy_data  = @FILTER(:taxonomy, taxonomy);
+		:taxonomy_data  = @FILTER(:taxonomy, taxonomy)
 		
 		
 		INSERT INTO taxonomy 
 			
 			( @KEYS(:taxonomy_data) )
 			
-	  	VALUES ( :taxonomy_data);
+	  	VALUES ( :taxonomy_data) RETURNING taxonomy_id;
 
 	END
 	
@@ -93,7 +93,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:taxonomy, taxonomy);
+		@FILTER(:taxonomy, taxonomy)
 
 		UPDATE taxonomy
 			

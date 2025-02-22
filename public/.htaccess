@@ -1,4 +1,4 @@
-Options +SymLinksIfOwnerMatch -Indexes
+#Options +SymLinksIfOwnerMatch -Indexes
 
 <Files *.php>
         Order Deny,Allow
@@ -73,7 +73,7 @@ RewriteRule ^ index.php [L]
     </FilesMatch>  
 </IfModule>
 
-FileETag None
+#FileETag None
 
 <IfModule mod_expires.c>
     ExpiresActive On

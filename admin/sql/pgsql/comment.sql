@@ -7,10 +7,9 @@
 		IN language_id INT,
 		IN site_id INT,
 		IN post_id INT,
-        IN user_id INT,
-        IN language_id INT,
-        IN status INT,
-        IN post_title INT,
+		IN user_id INT,
+		IN status INT,
+		IN post_title INT,
 
 		-- pagination
 		IN start INT,
@@ -23,9 +22,14 @@
 	)
 	BEGIN
 
-		SELECT user.*, comment.*, comment_id as array_key
-			FROM comment AS comment
-			LEFT JOIN user ON (comment.user_id = comment.user_id)	
+		SELECT "user".username, "user".email, "user".first_name,  "user".last_name,  "user".display_name, "user".avatar, "user".bio,  "user".subscribe, comment.*, comment_id as array_key
+			@IF isset(:post_title) AND :post_title
+			THEN 
+				,post_content.name, post_content.slug
+			END @IF			
+			
+			FROM comment
+			LEFT JOIN "user" ON ("user".user_id = comment.user_id)	
 
 			@IF isset(:post_title) AND :post_title
 			THEN 
@@ -90,6 +94,7 @@
 
 		SELECT * 
 			FROM comment AS _
+			LEFT JOIN "user" ON "user".user_id = _.user_id
 		WHERE 1 = 1
 
             @IF isset(:comment_id)
@@ -110,18 +115,18 @@
 
 	CREATE PROCEDURE add(
 		IN comment ARRAY,
-		OUT insert_id
+		OUT fetch_one
 	)
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:comment, comment);
+		@FILTER(:comment, comment)
 		
 		INSERT INTO comment 
 			
 			( @KEYS(:comment) )
 			
-	  	VALUES ( :comment )
+	  	VALUES ( :comment ) RETURNING comment_id;
         
 	END
 
@@ -134,7 +139,7 @@
 	)
 	BEGIN
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:comment, comment);
+		@FILTER(:comment, comment)
 
 		UPDATE comment 
 			

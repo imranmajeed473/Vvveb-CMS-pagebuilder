@@ -12,7 +12,7 @@
 	BEGIN
 		-- return_reason
 		SELECT *
-			FROM return_reason AS return_reason WHERE 1 = 1
+			FROM return_reason WHERE 1 = 1
 			
 		@IF !empty(:language_id) 
 		THEN			
@@ -51,7 +51,7 @@
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:return_reason_data  = @FILTER(:return_reason, return_reason);
+		:return_reason_data  = @FILTER(:return_reason, return_reason)
 		
 		
 		INSERT INTO return_reason 
@@ -71,7 +71,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:return_reason, return_reason);
+		@FILTER(:return_reason, return_reason)
 
 		UPDATE return_reason 
 			

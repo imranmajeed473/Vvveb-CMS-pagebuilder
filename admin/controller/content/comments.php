@@ -34,7 +34,7 @@ use Vvveb\System\Images;
 class Comments extends Listing {
 	protected $type = 'comment';
 
-	protected $list = 'comments';
+	protected $list = 'comment';
 
 	protected $module = 'content';
 
@@ -59,12 +59,12 @@ class Comments extends Listing {
 	}
 
 	function index() {
-		$view 		        = View :: getInstance();
-		$type 		        = $this->type;
+		$view           = View :: getInstance();
+		$type           = $this->type;
 		$controller     = $this->controller ?? $type;
 		$listController = $this->listController ?? $controller;
-		$module 	       = $this->module;
-		$list 		        = $this->list ?? $type . 's';
+		$module         = $this->module;
+		$list           = $this->list ?? $type . 's';
 		$status         = $this->request->get['status'] ?? '';
 
 		$comment_status = [
@@ -94,6 +94,10 @@ class Comments extends Listing {
 		foreach ($results[$type] as $id => &$comment) {
 			if (isset($comment['image'])) {
 				$comment['image'] = Images::image($type, $comment['image']);
+			}
+
+			if (isset($comment['avatar'])) {
+				$comment['avatar'] = Images::image($comment['avatar'], 'user');
 			}
 
 			$url                    = ['module' => "$module/$listController", 'action' => 'save', 'status' => $status, $type . '_id' => $comment[$type . '_id']];

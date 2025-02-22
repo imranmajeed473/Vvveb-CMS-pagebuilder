@@ -39,7 +39,7 @@
 @templates-select-option|before = <?php
 if ($optgroup != $option['folder']) {
 	$optgroup = $option['folder'];
-	echo '<optgroup label="' . ucfirst($optgroup) . '">';
+	echo '<optgroup label="' . ucfirst($optgroup ?? '') . '">';
 }
 ?>
 
@@ -56,14 +56,14 @@ if ($optgroup != $option['folder']) {
 
 
 
-
 /* language tabs */
 
 [data-v-languages]|before = <?php $_lang_instance = '@@__data-v-languages__@@';$_i = 0;?>
-[data-v-languages] [data-v-language]|deleteAllButFirstChild
-//[data-v-languages] [data-v-language]|addClass = <?php if ($_i == 0) echo 'active';?>
+@language = [data-v-languages] [data-v-language]
+@language|deleteAllButFirstChild
+//@language|addClass = <?php if ($_i == 0) echo 'active';?>
 
-[data-v-languages] [data-v-language]|before = <?php
+@language|before = <?php
 
 foreach ($this->languagesList as $language) {
 	$content = $this->{{type}}['{{type}}_content'][$language['language_id']] ?? [];
@@ -71,13 +71,13 @@ foreach ($this->languagesList as $language) {
 	[data-v-languages] [data-v-language-id]|id = <?php echo 'lang-' . $language['code'] . '-' . $_lang_instance;?>
 	[data-v-languages]  [data-v-language-id]|addClass = <?php if ($_i == 0) echo 'show active';?>
 
-	[data-v-languages] [data-v-language] [data-v-language-name] = $language['name']
-	[data-v-languages] [data-v-language] [data-v-language-img]|title = $language['name']
-	[data-v-languages] [data-v-language] [data-v-language-img]|src = <?php echo 'language/' . $language['code'] . '/' . $language['code'] . '.png';?>
-	[data-v-languages] [data-v-language] [data-v-language-link]|href = <?php echo '#lang-' . $language['code'] . '-' . $_lang_instance?>
-	[data-v-languages] [data-v-language] [data-v-language-link]|addClass = <?php if ($_i == 0) echo 'active';?>
+	@language [data-v-language-name] = $language['name']
+	@language [data-v-language-img]|title = $language['name']
+	@language [data-v-language-img]|src = <?php echo 'language/' . $language['code'] . '/' . $language['code'] . '.png';?>
+	@language [data-v-language-link]|href = <?php echo '#lang-' . $language['code'] . '-' . $_lang_instance?>
+	@language [data-v-language-link]|addClass = <?php if ($_i == 0) echo 'active';?>
 
-[data-v-languages] [data-v-language]|after = <?php 
+@language|after = <?php 
 $_i++;
 }
 ?>
@@ -88,27 +88,49 @@ $_i++;
 
 [data-v-{{type}}] input[data-v-{{type}}-content-*]|value = <?php
 	$desc = '@@__data-v-{{type}}-content-(*)__@@';
-	if (isset($content[$desc])) 
-		echo $content[$desc];
+	if (isset($content[$desc])) {
+		if ($desc == 'content') {
+			echo $content[$desc];
+		} else {
+			echo htmlspecialchars($content[$desc]);
+		}
+	}
 ?>
 
 [data-v-{{type}}] [data-v-{{type}}-content-*]|innerText = <?php
 	$desc = '@@__data-v-{{type}}-content-(*)__@@';
-	if (isset($content[$desc])) 
-		echo $content[$desc];
+	if (isset($content[$desc])) {
+		if ($desc == 'content') {
+			echo $content[$desc];
+		} else {
+			echo htmlspecialchars($content[$desc]);
+		}
+	}
 ?>
 
 [data-v-{{type}}] a[data-v-{{type}}-content-*]|href = <?php
 	$desc = '@@__data-v-{{type}}-content-(*)__@@';
-	if (isset($content[$desc])) 
-		echo $content[$desc];
+	if (isset($content[$desc])) {
+		if ($desc == 'content') {
+			echo $content[$desc];
+		} else {
+			echo htmlspecialchars($content[$desc]);
+		}
+	}
 ?>
+
 
 [data-v-{{type}}] textarea[data-v-{{type}}-content-*] = <?php
 	$desc = '@@__data-v-{{type}}-content-(*)__@@';
-	if (isset($content[$desc])) 
-		echo $content[$desc];
+	if (isset($content[$desc])) {
+		if ($desc == 'content') {
+			echo $content[$desc];
+		} else {
+			echo htmlspecialchars($content[$desc]);
+		}
+	}
 ?>
+
 
 [data-v-{{type}}] input[data-v-{{type}}-content-language_id]|value = <?php echo $language['language_id']; ?>
 
@@ -116,24 +138,44 @@ $_i++;
 
 /* Revisions */
 
-[data-v-languages] [data-v-language] [data-v-revision]|deleteAllButFirstChild
+@revision = [data-v-languages] [data-v-language] [data-v-revision]
+@revision|deleteAllButFirstChild
 
-[data-v-languages] [data-v-language] [data-v-revision]|before = <?php
+@revision|before = <?php
 $revisions = $content['revision'];
 foreach ($revisions as $revision) {
 ?>
 
-	[data-v-languages] [data-v-language] [data-v-revision] [data-v-revision-*] = $revision['@@__data-v-revision-(*)__@@']
+	@revision [data-v-revision-*]|innerText = $revision['@@__data-v-revision-(*)__@@']
+	@revision a[data-v-revision-*]|href     = $revision['@@__data-v-revision-(*)__@@']
 	
-	[data-v-languages] [data-v-language] [data-v-revision]|data-type		= '{{type}}'
-	[data-v-languages] [data-v-language] [data-v-revision]|data-{{type}}_id = $revision['{{type}}_id']
-	[data-v-languages] [data-v-language] [data-v-revision]|data-language_id = $revision['language_id']
-	[data-v-languages] [data-v-language] [data-v-revision]|data-created_at  = $revision['created_at']
+	@revision|data-type		   = '{{type}}'
+	@revision|data-{{type}}_id = $revision['{{type}}_id']
+	@revision|data-language_id = $revision['language_id']
+	@revision|data-created_at  = $revision['created_at']
 
-[data-v-languages] [data-v-language] [data-v-revision]|after = <?php 
+@revision|after = <?php 
 	}
 ?>
 
-[data-v-{{type}}] [data-v-revisions_url]|href = $this->revisions_url
+[data-v-{{type}}] [data-v-revisions_url]|href = <?php echo $this->revisions_url . '&language_id=' . $language['language_id'];?>
+
+
+@site = [data-v-sites] [data-v-site]
+@site|deleteAllButFirstChild
+
+@site|before = <?php
+if(isset($this->sitesList) && is_array($this->sitesList)) {
+	foreach ($this->sitesList as $index => $site) {?>
+	
+	@site [data-v-*]|innerText = $site['@@__data-v-(*)__@@']
+	@site [data-v-*]|title = $site['@@__data-v-(*)__@@']
+	@site input[data-v-*]|addNewAttribute = <?php if (isset($site['selected']) && $site['selected']) echo 'checked';?>
+
+	
+	@site|after = <?php
+	} 
+}?>
+
 
 import(content/post_taxonomy.tpl)

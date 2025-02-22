@@ -11,8 +11,8 @@
 	)
 	BEGIN
 		-- weight_type
-		SELECT *
-			FROM weight_type AS weight_type
+		SELECT *, weight_type.weight_type_id as array_key
+			FROM weight_type
 			INNER JOIN weight_type_content ON weight_type_content.weight_type_id = weight_type.weight_type_id
 		WHERE 1 = 1
 			
@@ -58,13 +58,13 @@
 	PROCEDURE add(
 		IN weight_type ARRAY,
 		IN language_id INT,
-		OUT insert_id
+		OUT insert_id,
 		OUT insert_id
 	)
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:weight_type_data  = @FILTER(:weight_type, weight_type);
+		:weight_type_data  = @FILTER(:weight_type, weight_type)
 		
 		INSERT INTO weight_type 
 			
@@ -73,7 +73,7 @@
 	  	VALUES ( :weight_type_data);
 
 		-- allow only table fields and set defaults for missing values
-		:weight_type_content_data  = @FILTER(:weight_type, weight_type_content);
+		:weight_type_content_data  = @FILTER(:weight_type, weight_type_content)
 		
 		INSERT INTO weight_type_content 
 			
@@ -93,7 +93,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		:weight_type_data  = @FILTER(:weight_type, weight_type);
+		:weight_type_data  = @FILTER(:weight_type, weight_type)
 
 		UPDATE weight_type 
 			
@@ -102,7 +102,7 @@
 		WHERE weight_type_id = :weight_type_id;
 		
 		-- allow only table fields and set defaults for missing values
-		:weight_type_content_data  = @FILTER(:weight_type, weight_type_content);
+		:weight_type_content_data  = @FILTER(:weight_type, weight_type_content)
 
 		UPDATE weight_type_content 
 			

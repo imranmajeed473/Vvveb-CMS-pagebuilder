@@ -47,6 +47,7 @@ class mysqli_result {
 	public function fetch_assoc() {
 		//$meta = $this->stmt->store_result();
 		$meta = $this->stmt->result_metadata();
+		$row  = [];
 
 		while ($field = $meta->fetch_field()) {
 			$params[] = &$row[$field->name];
@@ -55,6 +56,8 @@ class mysqli_result {
 		call_user_func_array([$this->stmt, 'bind_result'], $params);
 
 		while ($this->stmt->fetch()) {
+			$c = [];
+
 			foreach ($row as $key => $val) {
 				$c[$key] = $val;
 			}
@@ -62,7 +65,7 @@ class mysqli_result {
 		}
 
 		//$this->stmt->free_result();
-		$this->stmt->close();
+		//$this->stmt->close();
 
 		return $result;
 	}
@@ -160,10 +163,11 @@ class Mysqli extends DBDriver {
 	/*
 	 * Get all columns for a table used for sanitizing input
 	 */
-	function getColumnsMeta($tableName) {
+	function getColumnsMeta($tableName, $comment = false) {
 		$sql =
-		'SELECT COLUMN_NAME as name, COLUMN_DEFAULT as d, IS_NULLABLE  as n, DATA_TYPE as t, EXTRA as e
-		FROM `INFORMATION_SCHEMA`.`COLUMNS` 
+		'SELECT COLUMN_NAME as name, COLUMN_DEFAULT as d, IS_NULLABLE  as n, DATA_TYPE as t, EXTRA as e, CHARACTER_MAXIMUM_LENGTH as l'
+		. ($comment ? ', COLUMN_COMMENT as c' : '') .
+		' FROM `INFORMATION_SCHEMA`.`COLUMNS` 
 		WHERE `TABLE_SCHEMA`= "' . DB_NAME . '" 
 			AND `TABLE_NAME`="' . $tableName . '"';
 
@@ -248,6 +252,16 @@ class Mysqli extends DBDriver {
 
 	public function sqlLimit($start, $limit) {
 		return "LIMIT $start, $limit";
+	}
+
+	public function fetchArray($stmt) {
+		$result = $stmt->get_result();
+
+		if ($result) {
+			return $result->fetch_array(MYSQLI_ASSOC);
+		}
+
+		return [];
 	}
 
 	public function fetchAll($stmt) {

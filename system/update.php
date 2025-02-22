@@ -37,7 +37,7 @@ class Update {
 
 	protected $zipFile	= false;
 
-	function checkUpdates($type = 'core',$force = false) {
+	function checkUpdates($type = 'core', $force = false) {
 		if ($force) {
 			//delete update cache
 			$cacheKey    = md5($this->url);
@@ -45,12 +45,18 @@ class Update {
 			$cacheDriver->delete('url', $cacheKey);
 		}
 
+		$error  = '';
+		$result = false;
 		//cache results for one week
 		try {
-			$result = getUrl($this->url, true, 3600 * 24 * 7);
+			$result = getUrl($this->url, true);
 		} catch (\Exception $e) {
-			$result = '{}';
+			if (DEBUG) {
+				$error =  $e->getMessage();
+			}
 		}
+
+		$info = ['hasUpdate' => false];
 
 		if ($result) {
 			$info = json_decode($result, true);
@@ -62,7 +68,53 @@ class Update {
 			return $info;
 		}
 
-		return [];
+		if ($error) {
+			$info['error'] = $error;
+		}
+
+		return $info;
+	}
+
+	private function checkFolderPermissions($dir) {
+		$skip       = ['install', 'locale', 'vendor', 'plugins', 'config'];
+		$unwritable = [];
+
+		$handle = @opendir($dir);
+
+		while (false !== ($file = readdir($handle))) {
+			$full = $dir . DS . $file;
+
+			if (($file != '.') &&
+				($file != '..') && ! in_array($file, $skip)) {
+				if (is_dir($full)) {
+					if (! is_writable($full)) {
+						if (! @chmod($full, CHMOD_DIR)) {
+							return $full;
+						}
+					}
+
+					$result = $this->checkFolderPermissions($full);
+
+					if ($result !== true) {
+						return $result;
+					}
+				}
+				//if (str_ends_with($full, '.php') && ! is_writable($full)) {
+				if ((substr_compare($full,'.php', -4) === 0) && ! is_writable($full)) {
+					if (! @chmod($full, CHMOD_FILE)) {
+						return $full;
+					}
+				}
+			}
+		}
+
+		return true;
+	}
+
+	function checkPermissions() {
+		$check = $this->checkFolderPermissions(DIR_ROOT);
+
+		return $check;
 	}
 
 	static function backup() {
@@ -101,74 +153,98 @@ class Update {
 		return true;
 	}
 
-	function copyAdmin() {
+	private function copyFolder($src, $dest, $skipFolders = []) {
 		ignore_user_abort(true);
-		//$skipFolders = ['plugins', 'public', 'storage'];
-		rcopy($this->workDir . DS . 'admin', DIR_ROOT . DS . 'admin');
 
-		return true;
+		if (! is_writable($dest)) {
+			throw new \Exception(sprintf('Folder "%s" not writable!', $dest));
+		}
+
+		return rcopy($src, $dest, $skipFolders);
+	}
+
+	function copyAdmin() {
+		//$skipFolders = ['plugins', 'public', 'storage'];
+		return $this->copyFolder($this->workDir . DS . 'admin', DIR_ROOT . DS . 'admin');
 	}
 
 	function copyApp() {
 		ignore_user_abort(true);
 		//$skipFolders = ['plugins', 'public', 'storage'];
-		rcopy($this->workDir . DS . 'app', DIR_ROOT . DS . 'app');
-
-		return true;
+		return $this->copyFolder($this->workDir . DS . 'app', DIR_ROOT . DS . 'app');
 	}
 
 	function copySystem() {
-		ignore_user_abort(true);
-		//$skipFolders = ['plugins', 'public', 'storage'];
-		rcopy($this->workDir . DS . 'system', DIR_ROOT . DS . 'system');
-
-		return true;
+		return $this->copyFolder($this->workDir . DS . 'system', DIR_ROOT . DS . 'system');
 	}
 
 	function copyInstall() {
-		ignore_user_abort(true);
 		//$skipFolders = ['plugins', 'public', 'storage'];
-		rcopy($this->workDir . DS . 'install', DIR_ROOT . DS . 'install');
-
-		return true;
+		return $this->copyFolder($this->workDir . DS . 'install', DIR_ROOT . DS . 'install');
 	}
 
 	function copyCore() {
-		ignore_user_abort(true);
-		$skipFolders = ['plugins', 'public', 'storage', 'system', 'app', 'admin', 'install', 'config', 'env.php'];
-		rcopy($this->workDir, DIR_ROOT, $skipFolders);
+		$skipFolders = ['plugins', 'public', 'storage', 'system', 'app', 'admin', 'install', 'config', 'vendor', 'env.php'];
 
-		return true;
+		return $this->copyFolder($this->workDir, DIR_ROOT, $skipFolders);
 	}
 
 	function copyConfig() {
-		ignore_user_abort(true);
-		$skip = ['plugins.php', 'mail.php', 'sites.php', 'app.php', 'admin.php', 'routes.php', 'env.php'];
-		rcopy($this->workDir . DS . 'config', DIR_ROOT . DS . 'config', $skip);
+		$skip = ['plugins.php', 'mail.php', 'sites.php', 'app.php', 'admin.php', 'app-routes.php'];
 
-		return true;
+		return $this->copyFolder($this->workDir . DS . 'config', DIR_ROOT . DS . 'config', $skip);
 	}
 
 	function copyPublic() {
-		ignore_user_abort(true);
 		$skipFolders = ['plugins', 'themes', 'admin', 'media'];
-		rcopy($this->workDir . DS . 'public', DIR_PUBLIC, $skipFolders);
 
-		return true;
+		return $this->copyFolder($this->workDir . DS . 'public', DIR_PUBLIC, $skipFolders);
 	}
 
 	function copyPublicAdmin() {
 		ignore_user_abort(true);
 		$skipFolders = ['plugins'];
-		rcopy($this->workDir . DS . 'public' . DS . 'admin', DIR_PUBLIC . DS . 'admin', $skipFolders);
 
-		return true;
+		return $this->copyFolder($this->workDir . DS . 'public' . DS . 'admin', DIR_PUBLIC . DS . 'admin', $skipFolders);
 	}
 
 	function copyPublicMedia() {
-		ignore_user_abort(true);
 		$skipFolders = ['plugins', 'themes', 'admin'];
-		rcopy($this->workDir . DS . 'public' . DS . 'media', DIR_PUBLIC . DS . 'media', $skipFolders);
+
+		return $this->copyFolder($this->workDir . DS . 'public' . DS . 'media', DIR_PUBLIC . DS . 'media', $skipFolders);
+	}
+
+	function createNewTables() {
+		$db         = \Vvveb\System\Db::getInstance();
+		$tableNames = $db->getTableNames();
+
+		$driver  = DB_ENGINE;
+		$sqlPath = DIR_ROOT . "install/sql/$driver/";
+		$files   = \Vvveb\globBrace($sqlPath, ['', '*/*/'], '*.sql');
+
+		$diff = [];
+		//if the number of tables is less than in the install dir
+		if (count($tableNames) < count($files)) {
+			$tableSql = [];
+			//get table names from sql files
+			foreach ($files as $filename) {
+				$tableSql[] = basename($filename, '.sql');
+			}
+			//get the names of missing tables
+			$diff = array_diff($tableSql, $tableNames);
+		}
+
+		$sqlFiles = [];
+		//get files for missing tables
+		foreach ($diff as $key => $tableName) {
+			$sqlFiles[] = $files[$key];
+		}
+
+		//create missing tables
+		if ($sqlFiles) {
+			$sqlImport = new \Vvveb\System\Import\Sql();
+			$sqlImport->createTables($sqlFiles);
+		}
 
 		return true;
 	}
@@ -194,7 +270,7 @@ class Update {
 		//$dest        = substr(DIR_ROOT,0, -1); //remove trailing slash
 		rrmdir($this->workDir);
 		//plugins and themes are updated individually
-		$skipFolders = ['plugins', 'public' . DS . 'themes', 'storage'];
+		$skipFolders = ['plugins', 'public' . DS . 'themes', 'storage', 'vendor'];
 
 		rcopy($this->workDir, DIR_ROOT, $skipFolders);
 		rrmdir($this->workDir);

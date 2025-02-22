@@ -22,12 +22,14 @@
 
 namespace Vvveb\Component;
 
+use function Vvveb\getCurrentUrl;
 use function Vvveb\sanitizeHTML;
 use Vvveb\Sql\menuSQL;
 use Vvveb\Sql\postSQL;
 use Vvveb\Sql\productSQL;
 use Vvveb\System\Component\ComponentBase;
 use Vvveb\System\Event;
+use Vvveb\System\Sites;
 use function Vvveb\url;
 
 class Menu extends ComponentBase {
@@ -47,29 +49,23 @@ class Menu extends ComponentBase {
 		}
 
 		$menuSql               = new menuSQL();
-		$results               = $menuSql->getMenus($options);
-		$current_category_slug = false;
+		$results               = $menuSql->get($options);
 
 		//count the number of child menus (subcategories) for each category
-		if (isset($results['menus'])) {
+		if (isset($results['menu'])) {
 			$productIds = [];
 			$postIds    = [];
 
-			foreach ($results['menus'] as $taxonomy_item_id => &$category) {
+			foreach ($results['menu'] as $taxonomy_item_id => &$category) {
 				$parent_id = $category['parent_id'] ?? false;
-
-				if ($current_category_slug == $category['slug']) {
-					$category['active'] = true;
-				} else {
-					$category['active'] = false;
-				}
+				$type      = $category['type'] ?? 'link';
 
 				if (! isset($category['children'])) {
 					$category['children'] = 0;
 				}
 
 				if ($parent_id > 0) {
-					$parent = &$results['menus'][$parent_id];
+					$parent = &$results['menu'][$parent_id];
 
 					if (isset($parent['children'])) {
 						$parent['children']++;
@@ -77,17 +73,23 @@ class Menu extends ComponentBase {
 						$parent['children'] = 1;
 					}
 
-					if ($category['type'] == 'text') {
+					if ($type == 'text') {
 						$parent['has-text'] = true;
 					}
 				}
 
-				if ($category['type'] == 'product') {
-					$productIds[$taxonomy_item_id] = $category['item_id'];
+				if ($type == 'product') {
+					$productIds[$taxonomy_item_id]            = $category['item_id'];
+					$taxonomyProducts[$category['item_id']][] = $taxonomy_item_id;
 				}
 
-				if ($category['type'] == 'post' || $category['type'] == 'page') {
-					$postIds[$taxonomy_item_id] = $category['item_id'];
+				if (($type == 'post' || $type == 'page') && $category['item_id']) {
+					$postIds[$category['item_id']]         = $category['item_id'];
+					$taxonomyPosts[$category['item_id']][] = $taxonomy_item_id;
+				}
+
+				if ($type == 'link') {
+					$category['url'] = Sites::url($category['url'] ?? '');
 				}
 			}
 
@@ -103,14 +105,14 @@ class Menu extends ComponentBase {
 				$products   = $productSql->getAll($productOptions);
 
 				if (isset($products['products']) && $products['products']) {
-					$productTaxonomy = array_flip($productIds);
-
 					foreach ($products['products'] as $product) {
-						$taxonomy_item_id = $productTaxonomy[$product['product_id']];
-						$category         = &$results['menus'][$taxonomy_item_id];
-						$route            = "product/{$category['type']}/index";
-						$category['url']  = url($route, ['slug'=> $product['slug']]);
-						$category['name'] = $product['name'];
+						foreach ($taxonomyPosts[$product['product_id']] as $taxonomy_item_id) {
+							$taxonomy_item_id   = $productTaxonomy[$product['product_id']];
+							$category           = &$results['menu'][$taxonomy_item_id];
+							$route              = "product/{$category['type']}/index";
+							$category['url']    = url($route, ['slug'=> $product['slug'], 'product_id'=> $product['product_id']]);
+							$category['name']   = $product['name'];
+						}
 					}
 				}
 			}
@@ -126,21 +128,34 @@ class Menu extends ComponentBase {
 				$postSql = new postSql();
 				$posts   = $postSql->getAll($postOptions);
 
-				if (isset($posts['posts']) && $posts['posts']) {
-					$postTaxonomy = array_flip($postIds);
-
-					foreach ($posts['posts'] as $post) {
-						$taxonomy_item_id = $postTaxonomy[$post['post_id']];
-						$category         = &$results['menus'][$taxonomy_item_id];
-						$route            = "content/{$category['type']}/index";
-						$category['url']  = url($route, ['slug'=> $post['slug']]);
-						$category['name'] = $post['name'];
+				if (isset($posts['post']) && $posts['post']) {
+					foreach ($posts['post'] as $post) {
+						foreach ($taxonomyPosts[$post['post_id']] as $taxonomy_item_id) {
+							$category         = &$results['menu'][$taxonomy_item_id];
+							$route            = "content/{$category['type']}/index";
+							$url              = url($route, ['slug'=> $post['slug'], 'post_id'=> $post['post_id']]);
+							$category['url']  = $url;
+							$category['name'] = $post['name'];
+						}
 					}
 				}
 			}
 		}
 
 		list($results) = Event :: trigger(__CLASS__,__FUNCTION__, $results);
+
+		return $results;
+	}
+
+	//called on each request
+	function request(&$results, $index = 0) {
+		$currentUrl            = getCurrentUrl();
+
+		if (isset($results['menu'])) {
+			foreach ($results['menu'] as $taxonomy_item_id => &$category) {
+				$category['active'] = isset($category['url']) && ($category['url'] === $currentUrl);
+			}
+		}
 
 		return $results;
 	}

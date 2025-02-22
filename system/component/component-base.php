@@ -22,9 +22,11 @@
 
 namespace Vvveb\System\Component;
 
-use function Vvveb\session;
+use function Vvveb\session as sess;
 use Vvveb\System\Core\Request;
 use Vvveb\System\User\User;
+use Vvveb\System\Core\View;
+use Vvveb\System\Session;
 
 #[\AllowDynamicProperties]
 class ComponentBase {
@@ -34,25 +36,33 @@ class ComponentBase {
 
 	public static $global;
 
+	protected $options;
+
+	protected $_hash;
+
+	public static $defaultOptions = [];
+
 	function __construct($options = []) {
 		$request = Request :: getInstance();
 
 		if (! self :: $global) {
 			$user                                  = User::current();
 			self :: $global['start']               = 0;
-			self :: $global['site_id']             = defined('SITE_ID') ? SITE_ID : 0;
+			self :: $global['site_id']             = sess('site_id') ?? (defined('SITE_ID') ? SITE_ID : 0);
 			self :: $global['user_id']             = $user['user_id'] ?? null;
 			self :: $global['user_group_id']       = $user['user_group_id'] ?? 1;
-			self :: $global['language_id']         = session('language_id') ?? 1;
-			self :: $global['language']            = session('language') ?? 'en_US';
-			self :: $global['default_language']    = session('default_language') ?? 'en_US';
-			self :: $global['default_language_id'] = session('default_language_id') ?? 1;
-			self :: $global['currency_id']         = session('currency_id') ?? 1;
+			self :: $global['language_id']         = (isset($request->request['language_id']) && is_numeric($request->request['language_id'])) ?
+								$request->request['language_id'] : sess('language_id') ?? 1;
+			self :: $global['language']            = (isset($request->request['language']) && is_numeric($request->request['language'])) ?
+								$request->request['language'] : sess('language') ?? 'en_US';
+			self :: $global['default_language']    = sess('default_language') ?? 'en_US';
+			self :: $global['default_language_id'] = sess('default_language_id') ?? 1;
+			self :: $global['currency_id']         = sess('currency_id') ?? 1;
 		}
 
 		static :: $defaultOptions = array_merge(self :: $global, static :: $defaultOptions);
 
-		foreach (['site_id', 'language_id', 'currency_id', 'user_group_id'] as $key) {
+		foreach (['site_id', 'language_id', 'currency_id', 'user_id', 'user_group_id'] as $key) {
 			if (! isset(static :: $defaultOptions[$key]) || empty(static :: $defaultOptions[$key])) {
 				static :: $defaultOptions[$key] = self :: $global[$key];
 			}
@@ -92,7 +102,7 @@ class ComponentBase {
 					$key = substr($value, $dot + 1);
 				}
 
-				$value = isset($request->request[$key]) ? $request->request[$key] : null;
+				$value = (isset($request->request[$key]) ? $request->request[$key] : (isset($request->get[$key]) ? $request->get[$key] : null));
 			}
 		}
 
@@ -100,7 +110,6 @@ class ComponentBase {
 	}
 
 	static function di(&$component) {
-		return;
 		$component->request = Request::getInstance();
 		$component->view    = View::getInstance();
 		$component->session = Session::getInstance();

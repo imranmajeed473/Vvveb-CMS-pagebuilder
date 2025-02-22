@@ -13,7 +13,7 @@
 	BEGIN
 		-- language
 		SELECT *, code as array_key
-			FROM language as language WHERE 1 = 1
+			FROM language WHERE 1 = 1
 			
 			@IF isset(:status) 
 			THEN
@@ -65,19 +65,19 @@
 
 	PROCEDURE add(
 		IN language ARRAY,
-		OUT insert_id
+		OUT fetch_one
 	)
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:language_data  = @FILTER(:language, language);
+		:language_data  = @FILTER(:language, language)
 		
 		
 		INSERT INTO language 
 			
 			( @KEYS(:language_data) )
 			
-	  	VALUES ( :language_data );
+	  	VALUES ( :language_data ) RETURNING language_id;
 
 	END
 
@@ -103,7 +103,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:language, language);
+		@FILTER(:language, language)
 		
 		
 		UPDATE language 

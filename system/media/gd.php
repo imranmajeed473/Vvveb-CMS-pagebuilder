@@ -109,12 +109,32 @@ class Image {
 		}
 	}
 
-	public function resize($width, $height, $method = 's') {
-		if (! $this->width || ! $this->height) {
+	public function resize($width, $height = 0, $method = 's') {
+		switch ($method) {
+			case 's':
+			return $this->stretch($width, $height);
+
+			case 'c':
+			return $this->crop($width, $height);
+
+			case 'cs':
+			return $this->cropsize($width, $height);
+		}
+	}
+
+	public function stretch($width, $height = 0) {
+		if (! $this->width || ! $this->height || ! $this->image) {
 			return;
 		}
 
 		if ($width && $height) {
+			$scaleW = $width / $this->width;
+			$scaleH = $height / $this->height;
+
+			$scale = min($scaleW, $scaleH);
+
+			$width  = (int)($this->width * $scale);
+			$height = (int)($this->height * $scale);
 		} else {
 			if ($width) {
 				$height = ceil($this->height / ($this->width / $width));
@@ -132,6 +152,10 @@ class Image {
 	}
 
 	public function crop($topX, $topY, $bottomX, $bottomY) {
+		if (! $this->width || ! $this->height || ! $this->image) {
+			return;
+		}
+
 		$imageOld    = $this->image;
 		$this->image = imagecreatetruecolor($bottomX - $topX, $bottomY - $topY);
 
@@ -140,5 +164,39 @@ class Image {
 
 		$this->width  = $bottomX - $topX;
 		$this->height = $bottomY - $topY;
+	}
+
+	public function cropsize($width, $height = 0) {
+		if (! $this->width || ! $this->height || ! $this->image) {
+			return;
+		}
+
+		$width  = $width ?: $height;
+		$height = $height ?: $width;
+
+		$newRatio = $width / $height;
+		$ratio    =  $this->width / $this->height;
+
+		if ($newRatio > $ratio) {
+			$newWidth  = $width;
+			$newHeight = floor($width / $this->width * $this->height);
+			$crop_x    = 0;
+			$crop_y    = intval(($newHeight - $height) / 2);
+		} else {
+			$newWidth  = floor($height / $this->height * $this->width);
+			$newHeight = $height;
+			$crop_x    = intval(($newWidth - $width) / 2);
+			$crop_y    = 0;
+		}
+
+		$image = imagescale($this->image, $newWidth, $newHeight, IMG_BICUBIC_FIXED);
+
+		if ($image) {
+			$image = imagecrop($image, ['x' => 0, 'y' => 0, 'width' => $width, 'height' => $height]);
+
+			if ($image) {
+				$this->image = $image;
+			}
+		}
 	}
 }

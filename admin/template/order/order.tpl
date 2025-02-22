@@ -48,22 +48,27 @@ if(is_array($logs)) foreach ($logs as $index => $log) {
 ?>
 
 	//catch all data attributes
-	@log [data-v-order-log-*]|innerText  = $log['@@__data-v-order-log-(*)__@@']
-	@log a[data-v-order-log-*]|href      = $log['@@__data-v-order-log-(*)__@@']
-	@log input[data-v-order-log-*]|value = $log['@@__data-v-order-log-(*)__@@']
+	@log [data-v-order-log-note]|innerText  = <?php echo nl2br(htmlspecialchars($log['@@__data-v-order-log-(*)__@@']));?>
+	@log [data-v-order-log-*]|innerText     = $log['@@__data-v-order-log-(*)__@@']
+	@log a[data-v-order-log-*]|href         = $log['@@__data-v-order-log-(*)__@@']
+	@log input[data-v-order-log-*]|value    = $log['@@__data-v-order-log-(*)__@@']
 	@log .badge[data-v-order-log-order_status]|addClass = <?php echo Vvveb\orderStatusBadgeClass($log['order_status_id']);?>
 
 @log|after = <?php }?>
 
 
 [data-v-order] [data-v-order-*]|innerText = $this->order['@@__data-v-order-(*)__@@']
+[data-v-order] a[data-v-order-*]|href = $this->order['@@__data-v-order-(*)__@@']
 
 [data-v-order] [data-v-order-site_url]|href = $this->order['site_url']
 
 [data-v-order] .badge[data-v-order-order_status]|addClass = <?php echo $this->order['class'] ?? '';?>
+[data-v-order] .badge[data-v-order-payment_status]|addClass = <?php echo $this->order['payment_class'] ?? '';?>
+[data-v-order] .badge[data-v-order-shipping_status]|addClass = <?php echo $this->order['shipping_class'] ?? '';?>
 
 [data-v-order-print-url]|href = $this->printUrl
 [data-v-order-print-shipping-url]|href = $this->printShippingUrl
+[data-v-order-print-invoice-url]|href = $this->printInvoiceUrl
 
 
 @payment  = [data-v-payments] [data-v-payment]
@@ -76,15 +81,17 @@ if($order_payment && is_array($order_payment)) {
 	$count = count($order_payment);
 	foreach ($order_payment as $index => $payment) {?>
 		
-		@payment|data-payment_id = $payment['payment_id']
-		
-		@payment input[data-v-payment-*] = $payment['@@__data-v-payment-(*)__@@']
-		
-		@payment img[data-v-payment-*]|src = $payment['@@__data-v-payment-(*)__@@']
-		
-		@payment [data-v-payment-*]|innerText = $payment['@@__data-v-payment-(*)__@@']
-		
-		@payment a[data-v-payment-*]|href = $payment['@@__data-v-payment-(*)__@@']
+		@payment|data-payment_id                = $payment['payment_id']
+		@payment input[data-v-payment-*]        = $payment['@@__data-v-payment-(*)__@@']
+		@payment img[data-v-payment-*]|src      = $payment['@@__data-v-payment-(*)__@@']
+		@payment [data-v-payment-*]|innerText   = $payment['@@__data-v-payment-(*)__@@']
+		@payment [data-v-payment-key]|innerText = $index
+		@payment a[data-v-payment-*]|href       = $payment['@@__data-v-payment-(*)__@@']
+		@payment [type="radio"]|addNewAttribute = <?php
+			if (isset($this->order['payment_method']) && ($this->order['payment_method'] == $index)) {
+				echo 'checked';
+			}
+		?>
 	
 	@payment|after = <?php 
 	} 
@@ -101,17 +108,38 @@ if($order_shipping && is_array($order_shipping)) {
 	$count = count($order_shipping);
 	foreach ($order_shipping as $index => $shipping) {?>
 		
-		@shipping|data-shipping_id = $shipping['shipping_id']
-		
-		@shipping input[data-v-shipping-*] = $shipping['@@__data-v-shipping-(*)__@@']
-		
-		@shipping img[data-v-shipping-*]|src = $shipping['@@__data-v-shipping-(*)__@@']
-		
-		@shipping [data-v-shipping-*]|innerText = $shipping['@@__data-v-shipping-(*)__@@']
-		
-		@shipping a[data-v-shipping-*]|href = $shipping['@@__data-v-shipping-(*)__@@']
+		@shipping|data-shipping_id                = $shipping['shipping_id']
+		@shipping input[data-v-shipping-*]        = $shipping['@@__data-v-shipping-(*)__@@']
+		@shipping img[data-v-shipping-*]|src      = $shipping['@@__data-v-shipping-(*)__@@']
+		@shipping [data-v-shipping-*]|innerText   = $shipping['@@__data-v-shipping-(*)__@@']
+		@shipping [data-v-shipping-key]|innerText = $index
+		@shipping a[data-v-shipping-*]|href       = $shipping['@@__data-v-shipping-(*)__@@']
+		@shipping [type="radio"]|addNewAttribute  = <?php 
+			if (isset($this->order['shipping_method']) && ($this->order['shipping_method'] == $index)) {
+				echo 'checked';
+			}
+		?>
 	
 	@shipping|after = <?php 
 	} 
+}
+?>
+
+
+@cart-option = [data-v-cart] [data-v-order-product] [data-v-product-option]
+@cart-option|deleteAllButFirstChild
+
+
+@cart-option|before = <?php
+$_default = (isset($vvveb_is_page_edit) && $vvveb_is_page_edit ) ? [0 => 'product_option_value_id'] : false;
+$option_value = empty($product['option_value']) ? $_default : $product['option_value'];
+
+if($option_value) {
+	foreach ($option_value as $product_option_value_id => $value) { ?>
+
+	@cart-option [data-v-product-option-*]|innerText = $value['@@__data-v-product-option-(*)__@@']
+
+
+@cart-option|after = <?php } 
 }
 ?>

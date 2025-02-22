@@ -26,6 +26,8 @@ define('SQL_VAR_REGEX',
 	'/:([a-zA-Z0-9\[][\.\'a-zA-Z0-9\[\]_-]+)/ms');
 
 class DBDriver {
+	protected $quote;
+
 	public function _filter($data, $columns, $addMissingDefaults = false) {
 		//remove fields that are not table columns, $colums is returned by sqlp->getColumnsMeta()
 		foreach ($data as $key => $name) {
@@ -112,6 +114,87 @@ class DBDriver {
 			//row
 			return $this->_filter($data, $columns, $addMissingDefaults);
 		}
+	}
+
+	public function validate($data, $params, $table = '', $ignoreMissing = false) {
+		$errors = [];
+
+		foreach ($params as $name => $type) {
+			if (! isset($data[$name])) {
+				if (! $ignoreMissing) {
+				$errors[] = sprintf('%s missing!', $name);
+				}
+
+				continue;
+			}
+
+			if (is_array($type)) {
+				if (isset($data[$name]) && is_array($data[$name])) {
+					//check if collection
+					if (is_numeric(key($data[$name]))) {
+						$arr = $data[$name][0] ?? [];
+					} else {
+						$arr = $data[$name];
+					}
+
+					foreach ($type as $col => $attr) {
+						//skip auto increment
+						if ((isset($attr['e']) && $attr['e'] == 'auto_increment')
+							|| ($table && $col == $table . '_id')) {
+							continue;
+						}
+
+						if (! isset($arr[$col])) {
+							//skip columns that have default values
+							if (($attr['d'] === 'NULL' || $attr['d'] === NULL) && ! $ignoreMissing) {
+								$errors[] = sprintf('%s missing!', $name . '[' . $col . ']');
+							}
+						} else {
+							if (($attr['t'] == 'int' || $attr['t'] == 'decimal' || $attr['t'] == 'tinyint') && ! is_numeric($arr[$col])) {
+								$errors[] = sprintf('%s is not an integer!', $name . '[' . $col . ']');
+							}
+
+							if (isset($attr['l']) && $attr['l'] && (strlen($arr[$col]) > $attr['l'])) {
+								$errors[] = sprintf('%s is longer than %s!', $name . '[' . $col . ']', $attr['l']);
+							}
+						}
+					}
+				} else {
+					$errors[] = sprintf('%s is not an array!', $name);
+				}
+			} else {
+				switch ($type) {
+					case 'a':
+						if (! isset($data[$name]) || ! is_array($data[$name])) {
+							$errors[] = sprintf('%s is not an array!', $name);
+						} else {
+							if (substr_compare($name, '_id', -3 ,3) === 0 &&
+								! empty($data[$name]) &&
+								! is_numeric($data[$name][0])) {
+								$errors[] = sprintf('%s is not an integer!', $name . '[0]');
+							}
+						}
+
+						break;
+
+					case 'i':
+						if (! isset($data[$name]) || ! is_numeric($data[$name])) {
+							$errors[] = sprintf('%s is not an integer!', $name);
+						}
+
+						break;
+
+					case 's':
+						if (! isset($data[$name]) || ! is_string($data[$name])) {
+							$errors[] = sprintf('%s is not a string!', $name);
+						}
+
+						break;
+				}
+			}
+		}
+
+		return $errors;
 	}
 
 	/*
@@ -292,8 +375,12 @@ class DBDriver {
 		function ($matches) use (&$parameters, &$sql, &$index) {
 			$value = $parameters[$index++];
 
-			if (! is_numeric($value)) {
-				$value = "'$value'";
+			if (is_array($value)) {
+				$value = var_export($value, 1);
+			} else {
+				if (! is_numeric($value)) {
+					$value = "'$value'";
+				}
 			}
 
 			return $value;

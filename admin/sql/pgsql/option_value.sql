@@ -13,7 +13,7 @@
 	BEGIN
 		-- option_value
 		SELECT option_value.*, option_value_content.name
-			FROM option_value AS option_value
+			FROM option_value
 			INNER JOIN option_value_content 
 				ON option_value_content.option_value_id = option_value.option_value_id AND option_value_content.language_id = :language_id
 		
@@ -60,22 +60,23 @@
 
 	PROCEDURE add(
 		IN option_value ARRAY,
+		OUT fetch_one,
 		OUT insert_id
 	)
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:option_value_data  = @FILTER(:option_value, option_value);
+		:option_value_data  = @FILTER(:option_value, option_value)
 		
 		
 		INSERT INTO option_value 
 			
 			( @KEYS(:option_value_data) )
 			
-	  	VALUES ( :option_value_data );		
+	  	VALUES ( :option_value_data ) RETURNING option_value_id;		
 		
 		
-		:option_value_content  = @FILTER(:option_value, option_value_content);
+		:option_value_content  = @FILTER(:option_value, option_value_content)
 	  	
 		INSERT INTO option_value_content 
 			
@@ -96,7 +97,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		:option_value_data = @FILTER(:option_value, option_value);
+		:option_value_data = @FILTER(:option_value, option_value)
 
 		UPDATE option_value
 			
@@ -105,7 +106,7 @@
 		WHERE option_value_id = :option_value_id;
 		
 		-- allow only table fields and set defaults for missing values
-		:option_value_content = @FILTER(:option_value, option_value_content);
+		:option_value_content = @FILTER(:option_value, option_value_content)
 
 		UPDATE option_value_content
 			

@@ -35,12 +35,13 @@ class User extends UserBase {
 
 		$options    =  [
 			'type'         => 'admin', //$this->type,
+			'limit'=> 100,
 		] + $this->global;
 
 		$roles             = $roles->getAll($options);
 		$sites             = new SiteSQL();
 
-		$this->view->sitesList = $sites->getAll()['sites'] ?? [];
+		$this->view->sitesList = $sites->getAll()['site'] ?? [];
 		$this->view->roles     = $roles ? $roles['role'] : [];
 	}
 }

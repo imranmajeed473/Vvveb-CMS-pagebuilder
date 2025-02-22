@@ -25,12 +25,18 @@ namespace Vvveb\Controller\User;
 use \Vvveb\System\Functions\Str;
 use function Vvveb\__;
 use function Vvveb\setLanguage;
+use Vvveb\Sql\Admin_Failed_LoginSQL;
 use Vvveb\System\Event;
 use Vvveb\System\User\Admin;
 use Vvveb\System\Validator;
 
 #[\AllowDynamicProperties]
 class Login {
+	//failed attemps per minute Y-m-d H:i:00
+	protected $failedTimeInterval = 'Y-m-d H:00:00'; //failed attemps per hour
+
+	protected $failedCount = 10; //the number of failures before account is locked
+
 	protected function redirect($url = '/', $parameters = []) {
 		$redirect = \Vvveb\url($url, $parameters);
 
@@ -49,7 +55,7 @@ class Login {
 		}
 
 		//$this->checkAlreadyLoggedIn();
-		$view 	 	   = $this->view;
+		$view       = $this->view;
 		$admin      = Admin::current();
 		$admin_path = \Vvveb\adminPath();
 
@@ -57,28 +63,37 @@ class Login {
 			return $this->redirect($admin_path);
 		}
 
-		$this->view->action = $admin_path . 'index.php?module=user/login';
-		$this->view->modal  = $this->request->get['modal'] ?? false;
+		$this->view->adminPath = $admin_path;
+		$this->view->action    = $admin_path . 'index.php?module=user/login';
+		$this->view->modal     = $this->request->get['modal'] ?? false;
 
 		//$this->session = Session::getInstance();
 		$language = $this->session->get('language') ?? 'en_US';
 		setLanguage($language);
+
+		if (isset($this->request->get['success'])) {
+			$view->success['get'] = htmlentities($this->request->get['success']);
+		}
 
 		if (isset($this->request->get['errors'])) {
 			$view->errors['get'] = htmlentities($this->request->get['errors']);
 		}
 
 		if ($errors = $this->session->get('errors')) {
-			$view->errors['session'] = $errors;
+			if (is_array($errors)) {
+				$view->errors = ($view->errors ?? []) + $errors;
+			} else {
+				$view->errors['session'] = $errors;
+			}
 			$this->session->delete('errors');
 		}
 
-		if (isset($this->request->get['success'])) {
-			$view->success['get'] = htmlentities($this->request->get['success']);
-		}
-
 		if ($success = $this->session->get('success')) {
-			$view->success['session'] = $success;
+			if (is_array($success)) {
+				$view->success = ($view->success ?? []) + $success;
+			} else {
+				$view->success['session'] = $success;
+			}
 			$this->session->delete('success');
 		}
 
@@ -88,7 +103,9 @@ class Login {
 			$this->view->redir = $this->request->get['module'];
 		}
 
-		if (($this->request->method == 'POST') &&
+		$method = $this->request->getMethod();
+
+		if (($method == 'post') &&
 			($this->view->errors = $validator->validate($this->request->post)) === true) {
 			$user	    = $this->request->post['user'];
 
@@ -98,7 +115,19 @@ class Login {
 			if (strpos($user, '@')) {
 				$loginData['email'] = $user;
 			} else {
-				$loginData['user'] = $user;
+				$loginData['username'] = $user;
+			}
+
+			$failedLogin   = new Admin_Failed_LoginSQL();
+			$date          = date($this->failedTimeInterval);
+			$lastIp        = $_SERVER['REMOTE_ADDR'] ?? '';
+			$failedAttemps = $failedLogin->get(['updated_at' => $date, 'status' => 1] + $loginData);
+
+			if ($failedAttemps && ($failedAttemps['count'] > $this->failedCount)) {
+				$this->view->errors = [__('Too many login attempts, try again in one hour!')];
+				$failedLogin->logFailed(['last_ip' => $lastIp, 'updated_at' => $date] + $loginData);
+
+				return;
 			}
 
 			$loginData['password'] = $this->request->post['password'];
@@ -124,6 +153,8 @@ class Login {
 					//user not found or wrong password
 					$this->view->errors = [__('Authentication failed, wrong email or password!')];
 					$this->session->set('csrf', Str::random());
+					//increment failed attempts
+					$failedLogin->logFailed(['last_ip' => $lastIp, 'updated_at' => $date] + $loginData);
 				}
 			}
 		} else {

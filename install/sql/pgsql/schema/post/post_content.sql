@@ -1,18 +1,15 @@
 DROP TABLE IF EXISTS post_content;
 
-DROP SEQUENCE IF EXISTS post_content_seq;
-CREATE SEQUENCE post_content_seq;
-
 
 CREATE TABLE post_content (
-  "post_id" int check ("post_id" > 0) NOT NULL DEFAULT NEXTVAL ('post_content_seq'),
+  "post_id" int check ("post_id" > 0) NOT NULL,
   "language_id" int check ("language_id" > 0) NOT NULL,
-  "name" varchar(191) NOT NULL DEFAULT '',
-  "slug" varchar(191) NOT NULL DEFAULT '',
-  "content" text DEFAULT NULL,
-  "excerpt" text DEFAULT NULL,
-  "meta_keywords" text DEFAULT NULL,
-  "meta_description" text DEFAULT NULL,
+  "name" varchar(191) NOT NULL,
+  "slug" varchar(191) NOT NULL,
+  "content" text NOT NULL,
+  "excerpt" text DEFAULT '',
+  "meta_keywords" text NOT NULL DEFAULT '',
+  "meta_description" text NOT NULL DEFAULT '',
   PRIMARY KEY ("post_id","language_id")
 );
 

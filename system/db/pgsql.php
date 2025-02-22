@@ -100,9 +100,9 @@ class Pgsql extends DBDriver {
 	/*
 	 * Get all columns for a table used for sanitizing input
 	 */
-	function getColumnsMeta($tableName) {
+	function getColumnsMeta($tableName, $comment = false) {
 		$sql =
-		"SELECT data_type as t, column_name as name, column_default as d, is_nullable as n FROM information_schema.columns WHERE table_name ='$tableName'";
+		"SELECT data_type as t, column_name as name, column_default as d, is_nullable as n, character_maximum_length as l FROM information_schema.columns WHERE table_name ='$tableName'";
 
 		if ($result = $this->query($sql)) {
 			//$columns = $result->fetch_all(MYSQLI_ASSOC);
@@ -157,6 +157,16 @@ class Pgsql extends DBDriver {
 		return "LIMIT  $limit OFFSET $start";
 	}
 
+	public function fetchArray(&$result) {
+		if (pg_num_rows($result)) {
+			$values = pg_fetch_assoc($result);
+
+			return $values;
+		}
+
+		return [];
+	}
+
 	public function fetchAll(&$result) {
 		if (pg_num_rows($result)) {
 			$values = pg_fetch_all($result);
@@ -191,6 +201,10 @@ class Pgsql extends DBDriver {
 				throw new \Exception($errorMessage);
 			}
 
+			if ($result) {
+				$this->affected_rows = @pg_affected_rows($this->last_res);
+			}
+
 			return $this->last_res;
 		} catch (\Exception $e) {
 			$message = $e->getMessage() . "\n$sql\n";
@@ -212,7 +226,7 @@ class Pgsql extends DBDriver {
 	}
 
 	public function get_one($query, $parameters = null) {
-		$res = $this->exec($query, $parameters);
+		$res = $this->query($query, $parameters);
 
 		if (pg_num_rows($res)) {
 			return pg_fetch_result($res, 0, 0);
@@ -222,7 +236,7 @@ class Pgsql extends DBDriver {
 	}
 
 	function get_row($query, $parameters) {
-		$res = $this->exec($query . ' LIMIT 1', $parameters);
+		$res = $this->query($query . ' LIMIT 1', $parameters);
 
 		if ($res === null) {
 			$res = $this->last_res;
@@ -238,7 +252,7 @@ class Pgsql extends DBDriver {
 	}
 
 	public function get_all($query, $parameters = null) {
-		$res = $this->exec($query, $parameters);
+		$res = $this->query($query, $parameters);
 
 		if (pg_num_rows($res)) {
 			$values = pg_fetch_all($res);
@@ -285,6 +299,10 @@ class Pgsql extends DBDriver {
 			$this->last_res = pg_query(self :: $link, $sql);
 			//pg_send_query(self :: $link, $sql);
 			//$this->last_res = pg_get_result(self :: $link);
+		}
+
+		if ($this->last_res) {
+			$this->affected_rows = @pg_affected_rows($this->last_res);
 		}
 
 		if ($this->last_res == false) {

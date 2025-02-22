@@ -11,9 +11,9 @@
 	BEGIN
 		-- currency
 		SELECT *, code as array_key
-			FROM currency as currency WHERE 1 = 1
+			FROM currency WHERE 1 = 1
 			
-		@IF !empty(:status) 
+		@IF isset(:status) AND :status != ""
 		THEN			
 			AND status = :status
 		END @IF
@@ -48,7 +48,7 @@
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:currency_data  = @FILTER(:currency, currency);
+		:currency_data  = @FILTER(:currency, currency)
 		
 		
 		INSERT INTO currency 
@@ -68,7 +68,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:currency, currency);
+		@FILTER(:currency, currency)
 
 		UPDATE currency 
 			

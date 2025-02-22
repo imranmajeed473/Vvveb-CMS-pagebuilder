@@ -20,7 +20,7 @@
 		-- return array of categories for categories query
 		OUT fetch_all,
 		-- return categories count for count query
-		OUT fetch_one,
+		OUT fetch_one
 	)
 	BEGIN
 
@@ -82,7 +82,7 @@
 			
 			tc.language_id = :language_id AND t2s.site_id = :site_id
 
-			@IF isset(:search)
+			@IF isset(:search) && :search
 			THEN 
 			
 				AND tc.name LIKE :search
@@ -153,10 +153,10 @@
 		-- return array of categories for categories query
 		OUT fetch_all,
 		-- return categories count for count query
-		OUT fetch_one,
+		OUT fetch_one
 	)
 	BEGIN
-		SET group_concat_max_len = 10000;
+		-- SET group_concat_max_len = 10000;
 
 		SELECT DISTINCT categories.taxonomy_item_id, @taxonomy_item_id := categories.taxonomy_item_id, categories.*, tc.*, tc.content as content, categories.taxonomy_item_id as array_key
 			
@@ -172,7 +172,7 @@
 					LEFT JOIN post p ON (pc.post_id = p.post_id)  
 					LEFT JOIN post_to_taxonomy_item ptt ON (ptt.taxonomy_item_id = @taxonomy_item_id AND ptt.post_id = p.post_id)  
 				WHERE ptt.taxonomy_item_id = @taxonomy_item_id ORDER by p.sort_order
-			) AS posts
+			) AS post
 		
 			FROM taxonomy_item AS categories
 		
@@ -248,7 +248,7 @@
 		IN post_type CHAR,
 		IN type CHAR,
 		IN slug CHAR,
-		OUT fetch_row, 
+		OUT fetch_row
 	)
 	BEGIN
 		-- taxonomy_item
@@ -332,7 +332,7 @@
 		IN language_id INT,
 		IN post_type CHAR,
 		IN slug CHAR,
-		OUT fetch_row, 
+		OUT fetch_row
 	)
 	BEGIN
 	
@@ -410,7 +410,7 @@
 
 		DELETE FROM taxonomy_item_content WHERE taxonomy_item_id = :taxonomy_item_id;
 		
-		@FILTER(:taxonomy_item_content, taxonomy_item_content);
+		@FILTER(:taxonomy_item_content, taxonomy_item_content)
 		
 		@EACH(:taxonomy_item_content) 
 			INSERT INTO taxonomy_item_content 
@@ -423,7 +423,7 @@
 		-- SELECT * FROM taxonomy_item_option WHERE taxonomy_item_id = :taxonomy_item_id;
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:taxonomy_item, taxonomy_item);
+		@FILTER(:taxonomy_item, taxonomy_item)
 		
 		UPDATE taxonomy_item 
 			
@@ -442,13 +442,13 @@
 		IN site_id INT,
 		OUT insert_id,
 		OUT insert_id,
-		OUT insert_id,
+		OUT insert_id
 	)
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:taxonomy_item  = @FILTER(:taxonomy_item, taxonomy_item);
-		:taxonomy_item_content = @FILTER(:taxonomy_item_content, taxonomy_item_content);
+		:taxonomy_item  = @FILTER(:taxonomy_item, taxonomy_item)
+		:taxonomy_item_content = @FILTER(:taxonomy_item_content, taxonomy_item_content)
 
 		INSERT INTO taxonomy_item 
 		
@@ -457,13 +457,6 @@
 		VALUES ( :taxonomy_item );
 			
 
-		-- SET :taxonomy_item_content.taxonomy_item_id = last_insert_id;
-       --  SET @taxonomy_item_id = LAST_INSERT_ID();
-
-		-- UPDATE taxonomy_item SET image = :image WHERE taxonomy_item_id = :taxonomy_item_id;
-		
-		-- :taxonomy_item  = @FILTER(:taxonomy_item, taxonomy_item);
-		
 		INSERT INTO taxonomy_item_content 
 		
 			( taxonomy_item_id, @KEYS(:taxonomy_item_content) )
@@ -477,8 +470,6 @@
 			
 		VALUES ( @result.taxonomy_item, :site_id );
 		
-	 
-        SELECT @taxonomy_item_id as taxonomy_item_id;
 	END
 
 
@@ -491,6 +482,8 @@
 		IN site_id INT,
 		IN taxonomy_id INT,
 		IN search CHAR,
+		IN type CHAR,
+		IN post_type CHAR,
 		
 		-- pagination
 		IN start INT,
@@ -499,7 +492,7 @@
 		-- return array of categories for categories query
 		OUT fetch_all,
 		-- return categories count for count query
-		OUT fetch_one,
+		OUT fetch_one
 	)
 	BEGIN
 
@@ -537,7 +530,7 @@
 			
 			t2s.site_id = :site_id
 
-			@IF isset(:search)
+			@IF isset(:search) && :search
 			THEN 
 			
 				AND tc.name LIKE :search
@@ -547,21 +540,21 @@
 			@IF isset(:taxonomy_id)
 			THEN 
 			
-				AND categories.taxonomy_id LIKE :taxonomy_id
+				AND categories.taxonomy_id = :taxonomy_id
 				
 			END @IF	
 			
-			@IF isset(:type)
+			@IF isset(:type) && :type
 			THEN 
 			
-				AND taxonomy.type LIKE :type
+				AND taxonomy.type = :type
 				
 			END @IF				
 			
-			@IF isset(:post_type)
+			@IF isset(:post_type) && :post_type
 			THEN 
 			
-				AND taxonomy.post_type LIKE :post_type
+				AND taxonomy.post_type = :post_type
 				
 			END @IF			
 
@@ -591,7 +584,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		:taxonomy_item_content_data = @FILTER(:taxonomy_item.taxonomy_item_content, taxonomy_item_content);
+		:taxonomy_item_content_data = @FILTER(:taxonomy_item.taxonomy_item_content, taxonomy_item_content)
 
 		@EACH(:taxonomy_item_content_data) 
 			INSERT INTO taxonomy_item_content 
@@ -602,7 +595,7 @@
 				ON DUPLICATE KEY UPDATE @LIST(:each);
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:taxonomy_item, taxonomy_item);
+		@FILTER(:taxonomy_item, taxonomy_item)
 		
 		UPDATE taxonomy_item 
 			
@@ -618,13 +611,14 @@
 	CREATE PROCEDURE addTaxonomyItem(
 		IN taxonomy_item ARRAY,
 		IN site_id INT,
+		OUT insert_id,
 		OUT insert_id
 	)
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:taxonomy_item_content_data = @FILTER(:taxonomy_item.taxonomy_item_content, taxonomy_item_content);
-		:taxonomy_item_data  = @FILTER(:taxonomy_item, taxonomy_item);
+		:taxonomy_item_content_data = @FILTER(:taxonomy_item.taxonomy_item_content, taxonomy_item_content)
+		:taxonomy_item_data  = @FILTER(:taxonomy_item, taxonomy_item)
 		
 		INSERT INTO taxonomy_item 
 		
@@ -646,8 +640,6 @@
 			
 			VALUES ( @result.taxonomy_item, :each );
 			
-	 
-       		SELECT @taxonomy_item as taxonomy_item;
 
 	END
 
@@ -659,7 +651,7 @@
 	)
 	BEGIN
 		
-		:taxonomy_item_data  = @FILTER(:taxonomy_items, taxonomy_item);
+		:taxonomy_item_data  = @FILTER(:taxonomy_items, taxonomy_item)
 		
 		@EACH(:taxonomy_item_data) 
 			UPDATE taxonomy_item

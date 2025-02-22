@@ -14,7 +14,7 @@
 	BEGIN
 		-- region
 		SELECT country.name as country,region.*
-			FROM region AS region
+			FROM region
 		LEFT JOIN country ON country.country_id = region.country_id
 		
 		WHERE 1 = 1
@@ -24,7 +24,7 @@
 			AND region.country_id = :country_id
 		END @IF				
 		
-		@IF !empty(:status) 
+		@IF isset(:status) AND :status != "" 
 		THEN			
 			AND region.status = :status
 		END @IF		
@@ -74,7 +74,7 @@
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:region_data  = @FILTER(:region, region);
+		:region_data  = @FILTER(:region, region)
 		
 		
 		INSERT INTO region 
@@ -95,7 +95,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:region, region);
+		@FILTER(:region, region)
 
 		UPDATE region 
 			

@@ -28,6 +28,7 @@ use Vvveb\Sql\CountrySQL;
 use Vvveb\Sql\regionSQL;
 use Vvveb\Sql\SiteSQL;
 use Vvveb\System\CacheManager;
+use Vvveb\System\Event;
 use Vvveb\System\Extensions\Themes;
 use Vvveb\System\Images;
 use Vvveb\System\Sites;
@@ -62,12 +63,28 @@ class Site extends Base {
 	}
 
 	private function invoiceFormatPreview($format) {
-		$data = ['order_id' => 777, 'user_id' => 1000, 'site_id' => 1];
+		$data = ['order_id' => 777, 'customer_order_id' => 'OI888', 'user_id' => 1000, 'site_id' => 1];
+
+		return \Vvveb\invoiceFormat($format, $data);
+	}
+
+	private function orderIdFormatPreview($format) {
+		$data = ['order_id' => 777, 'customer_order_id' => 'OI888', 'user_id' => 1000, 'site_id' => 1];
 
 		return \Vvveb\invoiceFormat($format, $data);
 	}
 
 	function invoiceFormat() {
+		$format = $this->request->get['format'] ?? false;
+
+		if ($format) {
+			$format = $this->invoiceFormatPreview($format);
+		}
+
+		die($format);
+	}
+
+	function orderIdFormat() {
 		$format = $this->request->get['format'] ?? false;
 
 		if ($format) {
@@ -116,8 +133,14 @@ class Site extends Base {
 
 			$site['key'] = strtolower(Sites::siteKey($site['host']));
 
-			if (isset($this->request->get['site_id'])) {
-				$data['site_id']  = (int)$this->request->get['site_id'];
+			foreach ($settings['description'] as &$lang) {
+				foreach ($lang as $field => &$value) {
+					$value = \Vvveb\sanitizeHTML($value);
+				}
+			}
+
+			if (isset($this->request->get['site_id']) && ($site_id = $this->request->get['site_id'])) {
+				$data['site_id']  = (int)$site_id;
 				$site['settings'] = json_encode($settings);
 				$data['site']     = $site;
 				$site['id']       = $data['site_id'];
@@ -127,6 +150,8 @@ class Site extends Base {
 				unset($site['settings']);
 
 				Sites::setSiteDataById($data['site_id'], null, $site);
+
+				list($site, $settings, $site_id, $data) = Event :: trigger(__CLASS__,__FUNCTION__, $site, $settings, $site_id, $data);
 
 				if ($result >= 0) {
 					//CacheManager::delete('site');
@@ -141,19 +166,21 @@ class Site extends Base {
 				$data['site']             = $site;
 				$data['site']['settings'] = json_encode($settings);
 				$return                   = $sites->add($data);
-				$id                       = $return['site'];
+				$site_id                  = $return['site'];
 				$site['state']            = 'live';
-				$site['id']               = $id;
+				$site['id']               = $site_id;
 				Sites::saveSite($site);
 
-				if (! $id) {
+				list($site, $settings, $site_id, $data) = Event :: trigger(__CLASS__,__FUNCTION__, $site, $settings, $site_id, $data);
+
+				if (! $site_id) {
 					$view->errors = [$sites->error];
 				} else {
 					//CacheManager::delete('site');
 					CacheManager::delete();
 					$message       = __('Site saved!');
 					$view->success = [$message];
-					$this->redirect(['module'=>'settings/site', 'success'=> $message, 'site_id' => $id]);
+					$this->redirect(['module'=>'settings/site', 'success'=> $message, 'site_id' => $site_id]);
 				}
 			}
 		} else {
@@ -173,9 +200,14 @@ class Site extends Base {
 
 		if ($site_id) {
 			$site = $siteSql->get(['site_id' => $site_id]);
+			$data = Sites::getSiteById($site_id);
 
-			if (! $site) {
+			if (! $site || ! $data) {
 				return $this->notFound();
+			}
+
+			if ($data) {
+				$site = $data + $site;
 			}
 		}
 
@@ -189,7 +221,7 @@ class Site extends Base {
 		}
 
 		$data                       = $siteSql->getData(($setting ?? []) + $this->global);
-		$data['complete_status_id'] = $data['processing_status_id'] = $data['order_status_id'];
+		$data['complete_status_id'] = $data['processing_status_id'] = ($data['order_status_id'] ?? 1);
 
 		$data['timezone'] = [];
 
@@ -220,6 +252,8 @@ class Site extends Base {
 			$data['time_format'][$format] = date($format);
 		}
 
+		list($site, $setting, $site_id, $data) = Event :: trigger(__CLASS__,__FUNCTION__, $site, $setting, $site_id, $data);
+
 		if (! defined('CLI')) {
 			$view->domain = '';
 
@@ -227,12 +261,13 @@ class Site extends Base {
 				$view->domain = ($domain['domain'] ?? '') . '.' . ($domain['tld'] ?? '');
 			}
 
-			$setting['invoice_format_preview'] = $this->invoiceFormatPreview($setting['invoice_format'] ?? '');
+			$setting['invoice_format_preview']  = $this->invoiceFormatPreview($setting['invoice_format'] ?? '');
+			$setting['order_id_format_preview'] = $this->invoiceFormatPreview($setting['order_id_format'] ?? '');
 
 			$view->set($data);
 			$view->site         = $site + $setting;
 			$view->setting      = $setting;
-			$view->resize       = ['s' => __('Stretch'), 'c' => __('Crop')];
+			$view->resize       = ['cs' => __('Crop &amp; Resize'), 's' => __('Stretch'), 'c' => __('Crop')];
 			$view->themeList    = $themeList;
 			$view->templateList = \Vvveb\getTemplateList(false, ['email']);
 

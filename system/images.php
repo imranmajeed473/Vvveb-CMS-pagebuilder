@@ -35,14 +35,18 @@ use Vvveb\System\Media\Image;
 
 class Images {
 	static public function resize($src, $dest, $width, $height, $method) {
-		@mkdir(dirname($dest), (0755 & ~umask()), true);
+		$destDir = dirname($dest);
+
+		if (! file_exists($destDir)) {
+			@mkdir(dirname($dest), (0755 & ~umask()), true);
+		}
 		$img    = new Image($src);
 		$result = $img->resize($width,$height, $method);
 
 		return $img->save($dest);
 	}
 
-	static public function image($image, $type = '', $size = '', $method = 's') {
+	static public function image($image, $type = '', $size = '', $method = 'cs') {
 		$publicPath = \Vvveb\publicUrlPath();
 
 		list($publicPath, $type, $image, $size) =
@@ -70,10 +74,10 @@ class Images {
 					$site        = siteSettings();
 					$width       = $site["{$type}_{$size}_width"] ?? 0;
 					$height      = $site["{$type}_{$size}_height"] ?? 0;
-					$method      = $site["{$type}_{$size}_method"] ?? 's';
+					$method      = $site["{$type}_{$size}_method"] ?? 'cs';
 				}
 
-				$image = self::size($image,"{$width}x{$height}");
+				$image = self::size($image,"{$width}x{$height}_$method");
 
 				if ($width || $height) {
 					if (file_exists(DIR_PUBLIC . $cacheFolder . $image)) {

@@ -24,18 +24,18 @@ namespace Vvveb\Controller\Content;
 
 use \Vvveb\Sql\categorySQL;
 use Vvveb\System\Images;
+use function Vvveb\url;
 
 trait AutocompleteTrait {
 	function categoriesAutocomplete() {
 		$categories = new CategorySQL();
+		$text       = trim($this->request->get['text'] ?? '');
+		$post_type  = $this->request->get['post_type'] ?? '';
 
 		$results = $categories->getCategories([
-			'start'       => 0,
-			'limit'       => 10,
-			'language_id' => 1,
-			'site_id'     => 1,
-			'search'      => '%' . trim($this->request->get['text']) . '%',
-		]);
+			'post_type' => $post_type,
+			'search'    => '%' . $text . '%',
+		] + $this->global);
 
 		$search = [];
 
@@ -45,22 +45,16 @@ trait AutocompleteTrait {
 			}
 		}
 
-		$view         = $this->view;
-		$view->noJson = true;
-
 		$this->response->setType('json');
 		$this->response->output($search);
-
-		return false;
 	}
 
 	function manufacturersAutocomplete() {
 		$manufacturers = new \Vvveb\Sql\ManufacturerSQL();
+		$text          = trim($this->request->get['text'] ?? '');
 
 		$options = [
-			'start'       => 0,
-			'limit'       => 10,
-			'search'      => '%' . trim($this->request->get['text']) . '%',
+			'search' => '%' . $text . '%',
 		] + $this->global;
 
 		$results = $manufacturers->getAll($options);
@@ -74,20 +68,16 @@ trait AutocompleteTrait {
 			}
 		}
 
-		//echo json_encode($search);
 		$this->response->setType('json');
 		$this->response->output($search);
-
-		return false;
 	}
 
 	function vendorsAutocomplete() {
-		$vendors = new \Vvveb\Sql\VendorSQL();
+		$vendors    = new \Vvveb\Sql\VendorSQL();
+		$text       = trim($this->request->get['text'] ?? '');
 
 		$options = [
-			'start'  => 0,
-			'limit'  => 10,
-			'search' => '%' . trim($this->request->get['text']) . '%',
+			'search' => '%' . $text . '%',
 		] + $this->global;
 
 		$results = $vendors->getAll($options);
@@ -101,20 +91,17 @@ trait AutocompleteTrait {
 			}
 		}
 
-		//echo json_encode($search);
 		$this->response->setType('json');
 		$this->response->output($search);
-
-		return false;
 	}
 
-	function productsAutocomplete() {
-		$products = new \Vvveb\Sql\ProductSQL();
+	function urlAutocomplete() {
+		$products   = new \Vvveb\Sql\ProductSQL();
+		$text       = trim($this->request->get['text'] ?? '');
 
 		$options = [
-			'start'       => 0,
-			'limit'       => 10,
-			'search'      => trim($this->request->get['text']),
+			'limit' => 5,
+			'like'  => $text,
 		] + $this->global;
 
 		unset($options['admin_id']);
@@ -122,27 +109,70 @@ trait AutocompleteTrait {
 
 		$search = [];
 
-		if (isset($results['products'])) {
-			foreach ($results['products'] as $product) {
+		if (isset($results['product'])) {
+			foreach ($results['product'] as $product) {
+				$product['image'] = Images::image($product['image'], 'product', 'thumb');
+				$search[]         = [
+					'type' => 'cardimage',
+					'src'  => $product['image'],
+					'text' => $product['name'],
+					'value'=> '<a href="' . url('product/product/index', ['slug'=> $product['slug'], 'product_id' => $post['product_id']]) . '">' . $product['name'] . '</a>',
+				];
+			}
+		}
+
+		if (count($search) < 5) {
+			$posts   = new \Vvveb\Sql\PostSQL();
+			$results = $posts->getAll($options);
+
+			if (isset($results['post'])) {
+				foreach ($results['post'] as $post) {
+					$post['image'] = Images::image($post['image'], 'post', 'thumb');
+					$search[]      = [
+						'type' => 'cardimage',
+						'src'  => $post['image'],
+						'text' => $post['name'],
+						'value'=> '<a href="' . url('content/post/index', ['slug'=> $post['slug'], 'post_id' => $post['post_id']]) . '">' . $post['name'] . '</a>',
+					];
+				}
+			}
+		}
+
+		$this->response->setType('json');
+		$this->response->output($search);
+	}
+
+	function productsAutocomplete() {
+		$products   = new \Vvveb\Sql\ProductSQL();
+		$text       = trim($this->request->get['text'] ?? '');
+
+		$options = [
+			'like' => $text,
+		] + $this->global;
+
+		unset($options['admin_id']);
+		$results = $products->getAll($options);
+
+		$search = [];
+
+		if (isset($results['product'])) {
+			foreach ($results['product'] as $product) {
 				$product['image']                        = Images::image($product['image'], $this->object);
 				$search[$product[$this->object . '_id']] = '<img width="32" height="32" src="' . $product['image'] . '"> ' . $product['name'];
 			}
 		}
 
-		//echo json_encode($search);
 		$this->response->setType('json');
 		$this->response->output($search);
-
-		return false;
 	}
 
 	function adminsAutocomplete() {
-		$admins = new \Vvveb\Sql\AdminSQL();
+		$admins     = new \Vvveb\Sql\AdminSQL();
+		$text       = trim($this->request->get['text'] ?? '');
 
 		$options = [
-			'start'       => 0,
-			'limit'       => 10,
-			'search'      => trim($this->request->get['text']),
+			'status' => 1,
+			'search' => $text,
 		] + $this->global;
 
 		$results = $admins->getAll($options);
@@ -162,20 +192,17 @@ trait AutocompleteTrait {
 				$search[$admin['admin_id']] =  $text;
 			}
 		}
-		//echo json_encode($search);
+
 		$this->response->setType('json');
 		$this->response->output($search);
-
-		return false;
 	}
 
 	function attributesAutocomplete() {
 		$attributes = new \Vvveb\Sql\AttributeSQL();
+		$text       = trim($this->request->get['text'] ?? '');
 
 		$options = [
-			'start'       => 0,
-			'limit'       => 10,
-			'search'      => trim($this->request->get['text']),
+			'search' => $text,
 		] + $this->global;
 
 		$results = $attributes->getAll($options);
@@ -191,11 +218,9 @@ trait AutocompleteTrait {
 				$search[$attribute['attribute_id']] =  $text;
 			}
 		}
-		//echo json_encode($search);
+
 		$this->response->setType('json');
 		$this->response->output($search);
-
-		return false;
 	}
 
 	function optionValuesAutocomplete() {
@@ -218,20 +243,17 @@ trait AutocompleteTrait {
 				$search[$value['option_value_id']] =  $text;
 			}
 		}
-		//echo json_encode($search);
+
 		$this->response->setType('json');
 		$this->response->output($search);
-
-		return false;
 	}
 
 	function digitalAssetsAutocomplete() {
 		$digital_assets = new \Vvveb\Sql\Digital_assetSQL();
+		$text           = trim($this->request->get['text'] ?? '');
 
 		$options = [
-			'start'       => 0,
-			'limit'       => 10,
-			'search'      => trim($this->request->get['text']),
+			'search' => $text,
 		] + $this->global;
 
 		$results = $digital_assets->getAll($options);
@@ -247,10 +269,8 @@ trait AutocompleteTrait {
 				$search[$digital_asset['digital_asset_id']] =  $text;
 			}
 		}
-		//echo json_encode($search);
+
 		$this->response->setType('json');
 		$this->response->output($search);
-
-		return false;
 	}
 }

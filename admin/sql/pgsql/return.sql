@@ -12,7 +12,7 @@
 	BEGIN
 		-- return
 		SELECT return.*, return_resolution.name as return_resolution, return_reason.name as return_reason, return_status.name as return_status
-			FROM return AS return
+			FROM return
 			INNER JOIN return_resolution ON return_resolution.return_resolution_id = return.return_resolution_id AND return_resolution.language_id = :language_id
 			INNER JOIN return_reason ON return_reason.return_reason_id = return.return_reason_id AND return_reason.language_id = :language_id
 			INNER JOIN return_status ON return_status.return_status_id = return.return_status_id AND return_status.language_id = :language_id
@@ -49,19 +49,19 @@
 
 	PROCEDURE add(
 		IN return ARRAY,
-		OUT insert_id
+		OUT fetch_one
 	)
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:return_data  = @FILTER(:return, return);
+		:return_data  = @FILTER(:return, return)
 		
 		
 		INSERT INTO return 
 			
 			( @KEYS(:return_data) )
 			
-	  	VALUES ( :return_data );
+	  	VALUES ( :return_data ) RETURNING return_id;
 
 	END
 	
@@ -74,7 +74,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:return, return);
+		@FILTER(:return, return)
 
 		UPDATE return
 			

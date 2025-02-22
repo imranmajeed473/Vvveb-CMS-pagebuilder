@@ -41,8 +41,8 @@ class Posts extends ComponentBase {
 		'site_id'            => null,
 		'start'              => null,
 		'limit'              => ['url', 8],
-		'order_by'           => 'sort_order',
-		'direction'          => ['desc', 'asc'],
+		'order_by'           => 'post_id',
+		'direction'          => 'desc',
 		'status'             => 'publish',
 		'excerpt_limit'      => 200,
 		'comment_count'      => 1,
@@ -50,14 +50,17 @@ class Posts extends ComponentBase {
 		'taxonomy_item_id'   => NULL,
 		'taxonomy_item_slug' => NULL,
 		'search'             => NULL,
+		'search_boolean'     => true,
+		'like'               => NULL,
 		'admin_id'           => NULL,
 		//archive
-		'month'      => NULL,
-		'year'       => NULL,
-		'image_size' => 'medium',
-		'categories' => null,
-		'tags'       => null,
-		'taxonomy'   => null,
+		'month'              => NULL,
+		'year'               => NULL,
+		'image_size'         => 'medium',
+		'categories'         => null,
+		'tags'               => null,
+		'taxonomy'           => null,
+		'username'           => null,
 	];
 
 	public $options = [];
@@ -102,7 +105,7 @@ class Posts extends ComponentBase {
 		}
 
 		if (isset($this->options['order_by']) &&
-				! in_array($this->options['order_by'], ['created_at', 'updated_at'])) {
+				! in_array($this->options['order_by'], ['post_id', 'admin_id', 'sort_order', 'parent', 'type', 'created_at', 'updated_at', 'slug', 'name'])) {
 			unset($this->options['order_by']);
 		}
 
@@ -111,13 +114,16 @@ class Posts extends ComponentBase {
 			unset($this->options['direction']);
 		}
 
+		if ($this->options['search'] && $this->options['search_boolean']) {
+			$this->options['search'] .= '*';
+		}
+
 		$results = $posts->getAll($this->options);
 		//$languages = availableLanguages();
-
 		$type = $this->options['type'] ?: 'post';
 
-		if ($results && isset($results['posts'])) {
-			foreach ($results['posts'] as $id => &$post) {
+		if ($results && isset($results['post'])) {
+			foreach ($results['post'] as $id => &$post) {
 				if (isset($post['images'])) {
 					$post['images'] = json_decode($post['images'], 1);
 
@@ -175,6 +181,8 @@ class Posts extends ComponentBase {
 
 				//rfc
 				$post['pubDate'] = date('r', strtotime($post['created_at']));
+				$post['modDate'] = date('r', strtotime($post['updated_at']));
+				$post['lastMod'] = date('Y-m-d\TH:i:sP', strtotime($post['updated_at']));
 
 				//url
 				$url                  =  ['slug' => $post['slug'], 'post_id' => $post['post_id']] + $language;

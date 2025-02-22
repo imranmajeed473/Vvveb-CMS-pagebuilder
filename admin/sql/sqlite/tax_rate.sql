@@ -12,7 +12,7 @@
 	BEGIN
 		-- tax_rate
 		SELECT *
-			FROM tax_rate AS tax_rate WHERE 1 = 1
+			FROM tax_rate WHERE 1 = 1
 			
 		
 		@IF !empty(:limit) 
@@ -51,7 +51,7 @@
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:tax_rate_data  = @FILTER(:tax_rate, tax_rate);
+		:tax_rate_data  = @FILTER(:tax_rate, tax_rate)
 		
 		
 		INSERT INTO tax_rate 
@@ -71,7 +71,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:tax_rate, tax_rate);
+		@FILTER(:tax_rate, tax_rate)
 
 		UPDATE tax_rate
 			

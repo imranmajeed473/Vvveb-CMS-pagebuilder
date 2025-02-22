@@ -60,7 +60,15 @@ class Menus extends Categories {
 		$view         = $this->view;
 		$menus        = new menuSQL();
 
-		if ($menu_item_id && ($result = $menus->deleteMenuItem(['menu_item_id' => $menu_item_id]))) {
+		if ($menu_item_id) {
+			try {
+				//will fail on mysql 5
+				$result = $menus->deleteMenuItemRecursive(['menu_item_id' => $menu_item_id]);
+			} catch (\Exception $ex) {
+				//older mysql versions don't have recursive CTE
+				$result = $menus->deleteMenuItem(['menu_item_id' => $menu_item_id]);
+			}
+
 			if ($result['menu_item'] > 0) {
 				$success = __('Item deleted!');
 			} else {
@@ -73,7 +81,7 @@ class Menus extends Categories {
 			echo $menus->error;
 		}
 
-		die();
+		die(0);
 
 		return $this->index();
 	}
@@ -87,7 +95,7 @@ class Menus extends Categories {
 			echo __('Items reordered!');
 		}
 
-		die();
+		die(0);
 	}
 
 	function add() {
@@ -110,23 +118,36 @@ class Menus extends Categories {
 			}
 		}
 
+		$response     = [];
+		$success      = true;
+		$menu_item_id = false;
+
 		if (isset($data['menu_item_id']) && $data['menu_item_id']) {
-			$results = $menus->editMenuItem(['menu_item' => $data, 'menu_item_id' => $data['menu_item_id']]);
+			$results      = $menus->editMenuItem(['menu_item' => $data, 'menu_item_id' => $data['menu_item_id']]);
+			$menu_item_id = $data['menu_item_id'];
 
 			if ($results) {
-				echo __('Item saved!');
+				$message = __('Item saved!');
+			} else {
+				$message =  __('Error!');
+				$success = false;
 			}
 		} else {
 			$results = $menus->addMenuItem(['menu_item' => $data]);
 
 			if ($results) {
-				echo __('Item added!');
+				$menu_item_id = $results['menu_item'];
+				$message      =  __('Item added!');
+			} else {
+				$message =  __('Error!');
+				$success = false;
 			}
 		}
 
-		die();
+		$response += ['success' => $success, 'message' => $message, 'menu_item_id' => $menu_item_id];
 
-		return;
+		$this->response->setType('json');
+		$this->response->output($response);
 	}
 
 	function menu() {
@@ -183,8 +204,9 @@ class Menus extends Categories {
 				if (! $id) {
 					$view->errors = [$menu->error];
 				} else {
-					$view->success[] = __('Menu saved!');
-					$this->redirect(['module'=>'content/menus', 'action' => 'menu', 'menu_id' => $id]);
+					$success         = __('Menu saved!');
+					$view->success[] = $success;
+					$this->redirect(['module'=>'content/menus', 'action' => 'menu', 'menu_id' => $id, 'success' => $success]);
 				}
 			}
 		}
@@ -195,11 +217,9 @@ class Menus extends Categories {
 		$controllerPath  = $admin_path . 'index.php?module=media/media';
 		$view->scanUrl   = "$controllerPath&action=scan";
 		$view->uploadUrl = "$controllerPath&action=upload";
+		$view->linkUrl   = $admin_path . 'index.php?module=content/post&action=urlAutocomplete';
 		$theme           = Sites::getTheme() ?? 'default';
 		$view->themeCss  = PUBLIC_PATH . "themes/$theme/css/admin-post-editor.css";
-		//$view->themeCss        = PUBLIC_PATH . "themes/$theme/css/style.css";
-
-		//return 'content/menus/menu.html';
 	}
 
 	function index() {
@@ -210,7 +230,7 @@ class Menus extends Categories {
 			'limit' => 10000,
 		] + $this->global;
 
-		$results = $menus->getMenusList($options);
+		$results = $menus->getAll($options);
 
 		if (isset($results['menu'])) {
 			foreach ($results['menu'] as &$menu) {

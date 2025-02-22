@@ -25,13 +25,18 @@ if($manufacturers && is_array($manufacturers['manufacturer'])) {
 		
 		@manufacturer|id = <?php echo 'manufacturer-' . $manufacturer['manufacturer_id'];?>
 		
-		@manufacturer [data-v-manufacturer-content] = <?php echo $manufacturer['content'];?>
+		@manufacturer [data-v-manufacturer-content] = <?php echo($manufacturer['content']);?>
 		
 		@manufacturer img[data-v-manufacturer-*]|src = $manufacturer['@@__data-v-manufacturer-(*)__@@']
 		
 		@manufacturer [data-v-manufacturer-*]|innerText = $manufacturer['@@__data-v-manufacturer-(*)__@@']
 		
 		@manufacturer a[data-v-manufacturer-*]|href = $manufacturer['@@__data-v-manufacturer-(*)__@@']
+		@manufacturer input[data-v-manufacturer-manufacturer_id]|addNewAttribute = <?php 
+			if (isset($manufacturer['active']) && $manufacturer['active']) {
+				echo 'checked';
+			}
+		?>
 	
 	@manufacturer|after = <?php 
 	} 

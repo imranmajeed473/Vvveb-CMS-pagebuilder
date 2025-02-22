@@ -13,7 +13,7 @@
 	BEGIN
 		-- product_option
 		SELECT product_option.*, oc.name, `option`.type, product_option.product_option_id as array_key
-			FROM product_option AS product_option
+			FROM product_option
 			INNER JOIN `option` ON `option`.option_id = product_option.option_id
 			INNER JOIN option_content oc ON oc.option_id = product_option.option_id AND oc.language_id = :language_id
 		
@@ -65,7 +65,7 @@
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:product_option_data  = @FILTER(:product_option, product_option);
+		:product_option_data  = @FILTER(:product_option, product_option)
 		
 		
 		INSERT INTO product_option 
@@ -86,7 +86,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:product_option, product_option);
+		@FILTER(:product_option, product_option)
 
 		UPDATE product_option
 			

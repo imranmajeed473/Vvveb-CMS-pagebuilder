@@ -12,7 +12,7 @@
 	BEGIN
 		-- subscription_status
 		SELECT *
-			FROM subscription_status AS subscription_status WHERE 1 = 1
+			FROM subscription_status WHERE 1 = 1
 			
 		@IF !empty(:language_id) 
 		THEN			
@@ -51,7 +51,7 @@
 	BEGIN
 		
 		-- allow only table fields and set defaults for missing values
-		:subscription_status_data  = @FILTER(:subscription_status, subscription_status);
+		:subscription_status_data  = @FILTER(:subscription_status, subscription_status)
 		
 		
 		INSERT INTO subscription_status 
@@ -71,7 +71,7 @@
 	BEGIN
 
 		-- allow only table fields and set defaults for missing values
-		@FILTER(:subscription_status, subscription_status);
+		@FILTER(:subscription_status, subscription_status)
 
 		UPDATE subscription_status 
 			

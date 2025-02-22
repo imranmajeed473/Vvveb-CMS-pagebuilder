@@ -23,7 +23,7 @@
 namespace Vvveb\Component;
 
 use function Vvveb\model;
-use function Vvveb\session;
+use function Vvveb\session as sess;
 use Vvveb\Sql\CommentSQL;
 use Vvveb\System\Component\ComponentBase;
 use Vvveb\System\Event;
@@ -34,10 +34,11 @@ class Comments extends ComponentBase {
 
 	protected $route = 'content/post/index';
 
-	protected $model = 'comment';
+	protected $modelName = 'comment';
 
 	public static $defaultOptions = [
 		'post_id'     => 'url',
+		'user_id'     => null,
 		'slug'        => 'url',
 		'post_title'  => NULL, //include post title (for recent comments etc)
 		'status'      => 1, //approved comments
@@ -49,7 +50,7 @@ class Comments extends ComponentBase {
 
 	//called when fetching data, when cache expires
 	function results() {
-		$this->modelInstance         = model($this->model); //new CommentSQL();
+		$this->modelInstance         = model($this->modelName); //new CommentSQL();
 		$results                     = $this->modelInstance->getAll($this->options);
 		$results[$this->type]        = $results[$this->type] ?? [];
 
@@ -106,11 +107,13 @@ class Comments extends ComponentBase {
 				}
 
 				//rfc
-				$comment['pubDate'] = date('r', strtotime($comment['created_at']));
+				if (isset($comment['slug']) && $comment['slug']) {
+					$comment['pubDate'] = date('r', strtotime($comment['created_at']));
 
-				$anchor                = '#comment-' . $comment[$this->type . '_id'];
-				$comment['url']   	    =  url($this->route, $comment) . $anchor;
-				$comment['full-url']   =  url($this->route, $comment + ['host' => SITE_URL, 'scheme' => $_SERVER['REQUEST_SCHEME'] ?? 'http']) . $anchor;
+					$anchor                = '#comment-' . $comment[$this->type . '_id'];
+					$comment['url']   	    =  url($this->route, $comment) . $anchor;
+					$comment['full-url']   =  url($this->route, $comment + ['host' => SITE_URL, 'scheme' => $_SERVER['REQUEST_SCHEME'] ?? 'http']) . $anchor;
+				}
 				$comment['level']      =  $level;
 			}
 		}
@@ -124,7 +127,7 @@ class Comments extends ComponentBase {
 	function request(&$results, $index = 0) {
 		//check for user pending comments
 		$slug            = $this->options['slug'] ?? false;
-		$pendingComments = session($this->type, []);
+		$pendingComments = sess($this->type, []);
 
 		if ($slug && $pendingComments && isset($pendingComments[$slug])) {
 			$comments             = $pendingComments[$slug];

@@ -49,7 +49,7 @@ class Setting {
 		}
 
 		if (is_array($key) || empty($key)) {
-			$result = $this->settingSql->getSettings(['namespace' => $namespace, 'key' => $key, 'site_id' => $site_id]);
+			$result = $this->settingSql->getMulti(['namespace' => $namespace, 'key' => $key, 'site_id' => $site_id]);
 
 			if ($result) {
 				$return = [];
@@ -57,7 +57,7 @@ class Setting {
 				foreach ($result as $value) {
 					$val = $value['value'];
 
-					if ($val && is_string($val) && $val[0] == '{') {
+					if ($val && is_string($val) && ($val[0] == '{' || $val[0] == '[')) {
 						$json = json_decode($val, true);
 						$val  =  $json ?: $val;
 					}
@@ -83,11 +83,11 @@ class Setting {
 				return $this->setting[$namespace][$key];
 			}
 
-			$result = $this->settingSql->getSetting(['namespace' => $namespace, 'key' => $key, 'site_id' => $site_id]) ?? $default;
+			$result = $this->settingSql->get(['namespace' => $namespace, 'key' => $key, 'site_id' => $site_id]) ?? $default;
 
-			if ($result && is_string($result) && $result[0] == '{') {
+			if ($result && is_string($result) && ($result[0] == '{' || $result[0] == '[')) {
 				$json    = json_decode($result, true);
-				$result  =  $json ?: $result;
+				$result  =  $json ?? $result;
 			}
 
 			return $result;
@@ -96,7 +96,7 @@ class Setting {
 
 	public function set($namespace, $key, $value, $site_id = SITE_ID) {
 		if (! $namespace || ! $key) {
-			return $default;
+			return;
 		}
 
 		$this->setting[$namespace][$key] = $value;
@@ -105,12 +105,12 @@ class Setting {
 			$value = json_encode($value);
 		}
 
-		return $this->settingSql->setSetting(['namespace' => $namespace, 'key' => $key, 'value' => $value, 'site_id' => $site_id]);
+		return $this->settingSql->set(['namespace' => $namespace, 'key' => $key, 'value' => $value, 'site_id' => $site_id]);
 	}
 
-	public function delete($namespace, $key, $value, $site_id = SITE_ID) {
-		if (! $namespace || ! $key) {
-			return $default;
+	public function delete($namespace, $key, $site_id = SITE_ID) {
+		if (! $namespace) {
+			return;
 		}
 
 		unset($this->setting[$namespace][$key]);
@@ -118,21 +118,31 @@ class Setting {
 		return $this->settingSql->delete(['namespace' => $namespace, 'key' => $key, 'site_id' => $site_id]);
 	}
 
-	public function multiSet($namespace, $settings, $site_id = SITE_ID) {
+	public function setMulti($namespace, $settings, $site_id = SITE_ID) {
 		if (! $site_id) {
 			$site_id = 0;
 		}
 
 		$result = false;
 
+		foreach ($settings as &$item) {
+			if (is_array($item)) {
+				$item = json_encode($item);
+			}
+		}
+
+		$result = $this->settingSql->setMulti(['site_id' => $site_id, 'namespace' => $namespace, 'settings' => $settings]);
+
 		if ($settings) {
+			/*
 			foreach ($settings as $key => $value) {
 				if (is_array($value)) {
 					$value = json_encode($value);
 				}
 				$this->setting[$namespace][$key] = $value;
-				$result                          = $this->settingSql->setSetting(['namespace' => $namespace, 'key' => $key, 'value' => $value, 'site_id' => $site_id]);
+				$result                          = $this->settingSql->set(['namespace' => $namespace, 'key' => $key, 'value' => $value, 'site_id' => $site_id]);
 			}
+			 */
 		}
 
 		return $result;

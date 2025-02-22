@@ -22,13 +22,17 @@
 
 namespace Vvveb\Component;
 
+use function Vvveb\getCurrency;
+use function Vvveb\model;
 use function Vvveb\sanitizeHTML;
 use Vvveb\Sql\ProductSQL;
 use Vvveb\System\Cart\Currency;
 use Vvveb\System\Cart\Tax;
 use Vvveb\System\Component\ComponentBase;
+use Vvveb\System\Core\Request;
 use Vvveb\System\Event;
 use Vvveb\System\Images;
+use Vvveb\System\User\Admin;
 use function Vvveb\url;
 
 class Product extends ComponentBase {
@@ -70,6 +74,7 @@ class Product extends ComponentBase {
 
 		$tax                            = Tax::getInstance();
 		$currency                       = Currency::getInstance();
+		$results['price_currency']      = getCurrency();
 		$results['price_tax']           = $tax->addTaxes($results['price'], $results['tax_type_id']);
 		$results['price_tax_formatted'] = $currency->format($results['price_tax']);
 		$results['price_formatted']     = $currency->format($results['price']);
@@ -81,7 +86,34 @@ class Product extends ComponentBase {
 			$results['promotion_discount']      = 100 - ceil($results['promotion'] * 100 / $results['price']);
 		}
 
+		//rfc
+		$results['pubDate'] = date('r', strtotime($results['created_at']));
+		$results['modDate'] = date('r', strtotime($results['updated_at']));
+
 		list($results) = Event :: trigger(__CLASS__,__FUNCTION__, $results);
+
+		return $results;
+	}
+
+	//called on each request
+	function request(&$results, $index = 0) {
+		$request    = Request::getInstance();
+		$created_at = $request->get['created_at'] ?? ''; //revision preview
+
+		if ($created_at && $results['product_id']) {
+			//check if admin user to allow revision preview
+			$admin = Admin::current();
+
+			if ($admin) {
+				$revisions = model('post_content_revision');
+				$revision  = $revisions->get(['created_at' => $created_at, 'product_id' => $results['product_id'], 'language_id' => $results['language_id']]);
+
+				if ($revision && isset($revision['content'])) {
+					$results['content']    = $revision['content'];
+					$results['created_at'] = $revision['created_at'];
+				}
+			}
+		}
 
 		return $results;
 	}
@@ -93,6 +125,9 @@ class Product extends ComponentBase {
 		$product_content = [];
 		$publicPath      = \Vvveb\publicUrlPath() . 'media/';
 
+		$product         = [];
+		$product_content = [];
+
 		foreach ($fields as $field) {
 			$name  = $field['name'];
 			$value = $field['value'];
@@ -100,20 +135,29 @@ class Product extends ComponentBase {
 			if ($name == 'name') {
 				$product_content[$name] = strip_tags($value);
 			} else {
-				if ($name == 'content' || $name == 'excerpt') {
-					$product_content[$name] = sanitizeHTML($value);
+				if ($name == 'images') {
 				} else {
-					if ($name == 'image') {
-						$value = str_replace($publicPath,'', $value);
+					if ($name == 'content' || $name == 'excerpt') {
+						$product_content[$name] = sanitizeHTML($value);
+					} else {
+						if ($name == 'image') {
+							$value = str_replace($publicPath,'', $value);
+						}
+						$product[$name] = $value;
 					}
-					$product[$name] = $value;
 				}
 			}
 		}
 
-		$product_content['language_id']   = 1;
-		$product['product_content'][]     = $product_content;
-		$product['product_id']            = $id;
-		$result                           = $products->edit(['product' => $product, 'product_id' => $id]);
+		if ($product) {
+			//$product['product_id']            = $id;
+			$result = $products->edit(['product' => $product, 'product_id' => $id]);
+		}
+
+		if ($product_content) {
+			$product_content['language_id'] = self :: $global['language_id'];
+			//$product['product_content']['post_id'] = $id;
+			$result = $products->editContent(['product_content' => $product_content, 'product_id' => $id, 'language_id' => self :: $global['language_id']]);
+		}
 	}
 }
